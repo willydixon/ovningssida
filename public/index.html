@@ -2,22 +2,147 @@
 <html lang="sv">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Under uppbyggnad</title>
-<style>
-  :root { color-scheme: light dark; --bg: #faf9f7; --ink: #1f1e1d; --quiet: #5e5d59; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #1f1e1d; --ink: #f5f4ef; --quiet: #b8b5ab; } }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 32rem; padding: 2rem 1rem; text-align: center; }
-  h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
-  p { margin: 0; color: var(--quiet); line-height: 1.5; }
-</style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="color-scheme" content="light dark">
+<title>Övningssidan, testversion</title>
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.js"></script>
 </head>
 <body>
-<main>
-  <h1>Under uppbyggnad</h1>
-  <p>Här byggs en övningssida för skådespelare. Den är inte öppen än.</p>
+<div class="testband">Testversion. Scenerna är utkast och inte granskade än.</div>
+
+<main id="app">
+
+  <!-- 1. Startsida -->
+  <section data-screen="start" aria-labelledby="h-start">
+    <h1 id="h-start" tabindex="-1">Öva scener och spela in dig själv</h1>
+    <p class="lead">Välj en kort svensk scen, kontrollera ljud och ljus och gör en tagning med mobilens kamera.</p>
+    <ul class="promises">
+      <li><strong>Övning, inga betyg.</strong> Sidan bedömer inte ditt spel eller ditt utseende.</li>
+      <li><strong>Videon stannar i din mobil.</strong> Den skickas aldrig till oss.</li>
+      <li><strong>Gratis och utan konto.</strong> Det här är en testversion.</li>
+    </ul>
+    <div class="notice" id="inapp-notice" hidden>
+      <p><strong>Öppna gärna sidan i Safari eller Chrome.</strong> Du verkar ha öppnat länken inne i en app, och där fungerar kameran inte alltid.</p>
+      <p>Tryck på menyn med tre prickar i appen och välj att öppna i webbläsaren, eller kopiera länken.</p>
+      <button type="button" class="secondary" data-action="copy-link">Kopiera länken</button>
+      <p class="small" data-copy-status aria-live="polite"></p>
+    </div>
+    <button type="button" class="primary" data-action="to-age">Börja öva</button>
+  </section>
+
+  <!-- 2. Bekräfta 18 år -->
+  <section data-screen="age" aria-labelledby="h-age" hidden>
+    <h1 id="h-age" tabindex="-1">Tjänsten är för vuxna</h1>
+    <p>Du behöver vara 18 år eller äldre för att använda kameran här. Svaret sparas inte, så frågan kommer igen nästa gång.</p>
+    <label class="check">
+      <input type="checkbox" id="age-ok">
+      <span>Jag är 18 år eller äldre</span>
+    </label>
+    <div class="row">
+      <button type="button" class="ghost" data-action="to-start">Tillbaka</button>
+      <button type="button" class="primary" data-action="to-scenes" id="age-continue" disabled>Fortsätt</button>
+    </div>
+  </section>
+
+  <!-- 3. Välj scen och roll -->
+  <section data-screen="scenes" aria-labelledby="h-scenes" hidden>
+    <h1 id="h-scenes" tabindex="-1">Välj en scen</h1>
+    <p>Alla scener är för två personer. Du läser din roll, och motspelarens repliker står i texten.</p>
+    <div id="scene-list" class="scene-list"></div>
+    <div id="role-pick" hidden>
+      <h2 id="h-role" tabindex="-1">Vilken roll vill du spela?</h2>
+      <p id="role-situation" class="situation"></p>
+      <div id="role-buttons" class="row"></div>
+      <button type="button" class="ghost" data-action="pick-other-scene">Välj en annan scen</button>
+    </div>
+  </section>
+
+  <!-- 4. Teknikkoll -->
+  <section data-screen="check" aria-labelledby="h-check" hidden>
+    <h1 id="h-check" tabindex="-1">Teknikkoll</h1>
+    <p>Placera mobilen så att ditt ansikte och dina axlar syns inom ramen. Kontrollen mäter bara ljud, ljus och bildutsnitt.</p>
+    <div class="camera">
+      <video id="preview-check" class="mirror" autoplay muted playsinline></video>
+      <div class="frame" aria-hidden="true"></div>
+    </div>
+    <div class="meter" aria-hidden="true"><div class="meter-fill" id="meter-fill"></div></div>
+    <p class="prompt" id="check-prompt" aria-live="polite">Tryck på Starta kontrollen. Var först tyst i två sekunder och säg sedan din första replik med vanlig röst.</p>
+    <ul class="results" id="check-results" hidden></ul>
+    <div class="row">
+      <button type="button" class="secondary" data-action="run-check" id="run-check">Starta kontrollen</button>
+      <button type="button" class="primary" data-action="to-record">Till inspelningen</button>
+    </div>
+    <p class="small">Förhandsbilden visas spegelvänd, som i en spegel. Den sparade videon blir rättvänd.</p>
+  </section>
+
+  <!-- 5. Spela in -->
+  <section data-screen="record" aria-labelledby="h-record" hidden>
+    <h1 id="h-record" tabindex="-1">Spela in</h1>
+    <div class="camera small">
+      <video id="preview-record" class="mirror" autoplay muted playsinline></video>
+      <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
+      <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / 3:00</div>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" data-action="start-rec" id="start-rec">Starta inspelning</button>
+      <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>Stoppa</button>
+    </div>
+    <div class="script" id="script" aria-label="Scenens repliker"></div>
+    <p class="small">En tagning kan vara högst 3 minuter.</p>
+  </section>
+
+  <!-- 6. Titta -->
+  <section data-screen="review" aria-labelledby="h-review" hidden>
+    <h1 id="h-review" tabindex="-1">Titta på tagningen</h1>
+    <p class="notice" id="review-note" hidden></p>
+    <video id="playback" controls playsinline></video>
+    <p class="small" id="playback-error" hidden>Uppspelningen fungerar inte i den här webbläsaren, men du kan ändå spara videon.</p>
+    <div class="row">
+      <button type="button" class="ghost" data-action="retake">Ta om</button>
+      <button type="button" class="primary" data-action="to-save">Spara</button>
+    </div>
+  </section>
+
+  <!-- 7. Spara eller dela -->
+  <section data-screen="save" aria-labelledby="h-save" hidden>
+    <h1 id="h-save" tabindex="-1">Spara videon i mobilen</h1>
+    <p>Videon finns bara här i webbläsaren och försvinner när du stänger sidan. Spara den innan du går vidare.</p>
+    <button type="button" class="primary" data-action="share" id="share-btn" hidden>Spara eller dela</button>
+    <a class="button secondary" id="download-link" href="#" download>Ladda ned videon</a>
+    <p class="small" id="save-status" aria-live="polite"></p>
+    <ul class="tips">
+      <li><strong>iPhone:</strong> tryck på Spara eller dela och välj Spara video, så hamnar den i Bilder. En nedladdning hamnar i stället i appen Filer.</li>
+      <li><strong>Android:</strong> en nedladdning hamnar i mappen Nedladdningar och syns oftast i Galleri eller Google Foto.</li>
+    </ul>
+    <div class="row">
+      <button type="button" class="ghost" data-action="retake">Ny tagning</button>
+      <button type="button" class="ghost" data-action="to-scenes">Välj en annan scen</button>
+    </div>
+  </section>
+
+  <!-- Hjälp vid fel -->
+  <section data-screen="help" aria-labelledby="h-help" hidden>
+    <h1 id="h-help" tabindex="-1">Kameran kunde inte starta</h1>
+    <div id="help-text"></div>
+    <div class="row">
+      <button type="button" class="ghost" data-action="to-start">Till startsidan</button>
+      <button type="button" class="primary" data-action="retry-camera">Försök igen</button>
+    </div>
+  </section>
+
 </main>
+
+<footer>
+  <nav aria-label="Om sidan">
+    <a href="om.html">Om sidan</a>
+    <a href="ai.html">Så används AI</a>
+    <a href="integritet.html">Integritet</a>
+    <a href="villkor.html">Villkor</a>
+    <a href="kontakt.html">Kontakt</a>
+  </nav>
+</footer>
 </body>
 </html>

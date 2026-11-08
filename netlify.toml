@@ -1,0 +1,11 @@
+# Statisk sida utan byggsteg. Allt som publiceras ligger i public/.
+[build]
+  publish = "public"
+
+# Sidan ska inte synas i sökmotorer förrän den öppnas.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"

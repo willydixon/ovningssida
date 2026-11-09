@@ -4,6 +4,7 @@
 // nätverksanrop från skriptet.
 
 import { SCENES } from './scenes.js';
+import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
 
 const MAX_SECONDS = 180;
 
@@ -18,15 +19,6 @@ const MIME_CANDIDATES = [
   'video/webm;codecs="vp8,opus"',
   'video/webm'
 ];
-
-// Trösklar för teknikkollen, i dBFS och luma (0–255). Startvärden som
-// kalibreras på riktiga mobiler.
-const LIMITS = {
-  speech: { greenLow: -28, greenHigh: -12, yellowLow: -36 },
-  peak: { yellow: -3, red: -1 },
-  noise: { green: -50, red: -40 },
-  light: { redLow: 50, greenLow: 70, greenHigh: 200, whiteShare: 0.10 }
-};
 
 const state = {
   adult: false,
@@ -244,8 +236,6 @@ function connectAnalyser() {
   }
 }
 
-const toDb = (x) => (x > 0 ? 20 * Math.log10(x) : -120);
-
 function readLevels() {
   const analyser = state.analyser;
   if (!analyser) return null;
@@ -257,16 +247,7 @@ function readLevels() {
     analyser.getByteTimeDomainData(bytes);
     for (let i = 0; i < bytes.length; i++) buf[i] = (bytes[i] - 128) / 128;
   }
-  let sum = 0;
-  let peak = 0;
-  for (let i = 0; i < buf.length; i++) {
-    const v = buf[i];
-    sum += v * v;
-    const a = Math.abs(v);
-    if (a > peak) peak = a;
-  }
-  const rms = Math.sqrt(sum / buf.length);
-  return { rmsDb: toDb(rms), peakDb: toDb(peak), clipped: peak >= 0.999 };
+  return levelsFrom(buf);
 }
 
 function startMeter() {
@@ -313,12 +294,6 @@ function sample(ms) {
   });
 }
 
-function percentile(values, p) {
-  if (!values.length) return -120;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))];
-}
-
 function measureLight(video) {
   if (!video || !video.videoWidth) return null;
   const canvas = document.createElement('canvas');
@@ -326,44 +301,7 @@ function measureLight(video) {
   canvas.height = 48;
   const g = canvas.getContext('2d', { willReadFrequently: true });
   g.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const data = g.getImageData(0, 0, canvas.width, canvas.height).data;
-  const n = data.length / 4;
-  let sum = 0;
-  let white = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-    sum += y;
-    if (y > 245) white++;
-  }
-  return { mean: sum / n, whiteShare: white / n };
-}
-
-function rateSpeech(db) {
-  if (db < LIMITS.speech.yellowLow) return ['bad', 'För lågt ljud', 'Gå närmare mobilen, tala med vanlig röst och kontrollera att inget täcker mikrofonen.'];
-  if (db < LIMITS.speech.greenLow) return ['warn', 'Lite lågt ljud', 'Gå lite närmare mobilen eller tala lite högre.'];
-  if (db > LIMITS.speech.greenHigh) return ['warn', 'Högt ljud', 'Håll mobilen lite längre bort.'];
-  return ['good', 'Bra ljudnivå', 'Rösten hörs tydligt.'];
-}
-
-function ratePeaks(db, clipped) {
-  if (clipped || db >= LIMITS.peak.red) return ['bad', 'Ljudet klipper', 'Håll mobilen längre bort eller tala lite lägre.'];
-  if (db >= LIMITS.peak.yellow) return ['warn', 'Nära gränsen', 'Tala lite lägre eller håll mobilen längre bort.'];
-  return ['good', 'Inga toppar som klipper', 'Starka ljud hörs utan att förvrängas.'];
-}
-
-function rateNoise(db) {
-  if (db > LIMITS.noise.red) return ['bad', 'Mycket bakgrundsljud', 'Byt rum, eller stäng dörrar, fönster och fläktar.'];
-  if (db > LIMITS.noise.green) return ['warn', 'Lite bakgrundsljud', 'Stäng av musik och fläktar om det går.'];
-  return ['good', 'Tyst bakgrund', 'Inget stör rösten.'];
-}
-
-function rateLight(light) {
-  if (!light) return ['warn', 'Ljuset kunde inte mätas', 'Kontrollera själv att ansiktet syns tydligt.'];
-  if (light.whiteShare > LIMITS.light.whiteShare) return ['bad', 'Motljus eller för starkt ljus', 'Ställ dig så att ljuset kommer framifrån, inte bakifrån.'];
-  if (light.mean < LIMITS.light.redLow) return ['bad', 'För mörkt', 'Vänd dig mot ett fönster eller tänd en lampa framför dig.'];
-  if (light.mean < LIMITS.light.greenLow) return ['warn', 'Lite mörkt', 'Mer ljus framifrån gör bilden tydligare.'];
-  if (light.mean > LIMITS.light.greenHigh) return ['warn', 'Mycket ljust', 'Flytta dig lite från det starkaste ljuset.'];
-  return ['good', 'Bra ljus', 'Ansiktet syns tydligt.'];
+  return lumaStats(g.getImageData(0, 0, canvas.width, canvas.height).data);
 }
 
 function addResult(list, name, [level, label, advice], value) {

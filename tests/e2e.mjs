@@ -219,6 +219,179 @@ try {
   check(p5requests.every((r) => r.method === 'GET' && r.url.startsWith(BASE)), 'De nya sidorna skickar inget och anropar inga andra adresser');
   check((await p5ctx.cookies()).length === 0, 'De nya sidorna sätter inga kakor');
   await p5ctx.close();
+
+  // ---- 6. Motspelaren läser repliker ----
+  // Talsyntesen byts mot en falsk med en svensk röst som "läser" i 1,2 s, och
+  // mikrofonen mot en ton som testet slår på och av, som om användaren pratar.
+  const { SCENES } = await import('../public/scenes.js');
+  const lines = SCENES[0].repliker;
+  const p6ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  const p6 = await p6ctx.newPage();
+  const p6errors = [];
+  const p6requests = [];
+  p6.on('console', (m) => { if (m.type() === 'error') p6errors.push(m.text()); });
+  p6.on('pageerror', (e) => p6errors.push(String(e)));
+  p6.on('request', (r) => p6requests.push({ url: r.url(), method: r.method() }));
+  await p6.addInitScript(() => {
+    window.__spoken = [];
+    window.__speakMs = 1200;
+    window.__voices = [
+      { name: 'Nätröst', lang: 'sv-SE', localService: false, default: true, voiceURI: 'nat' },
+      { name: 'Engelska', lang: 'en-US', localService: true, default: false, voiceURI: 'en' },
+      { name: 'Alva', lang: 'sv-SE', localService: true, default: false, voiceURI: 'alva' }
+    ];
+    let timer = 0;
+    let current = null;
+    const synth = {
+      speaking: false,
+      pending: false,
+      paused: false,
+      getVoices: () => window.__voices,
+      speak(u) {
+        if (!u.text) return; // den tysta upplåsningen för iPhone
+        window.__spoken.push({ text: u.text, voice: u.voice && u.voice.name, lang: u.lang });
+        current = u;
+        this.speaking = true;
+        timer = setTimeout(() => {
+          this.speaking = false;
+          current = null;
+          if (u.onend) u.onend({});
+        }, window.__speakMs);
+      },
+      cancel() {
+        clearTimeout(timer);
+        this.speaking = false;
+        if (current) {
+          const u = current;
+          current = null;
+          if (u.onerror) u.onerror({ error: 'interrupted' });
+        }
+      },
+      pause() {},
+      resume() {},
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true });
+    window.SpeechSynthesisUtterance = class {
+      constructor(text) { Object.assign(this, { text, voice: null, lang: '', volume: 1, rate: 1, pitch: 1 }); }
+    };
+    const md = navigator.mediaDevices;
+    const orig = md.getUserMedia.bind(md);
+    md.getUserMedia = async (constraints) => {
+      const stream = await orig(constraints);
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.001; // tyst rum, cirka -63 dB
+      const dest = ctx.createMediaStreamDestination();
+      osc.connect(gain).connect(dest);
+      osc.start();
+      window.__talk = (on) => { gain.gain.value = on ? 0.2 : 0.001; }; // tal, cirka -17 dB
+      for (const track of stream.getAudioTracks()) { stream.removeTrack(track); track.stop(); }
+      stream.addTrack(dest.stream.getAudioTracks()[0]);
+      return stream;
+    };
+  });
+  const currentLine = () => p6.evaluate(() => {
+    const el = document.querySelector('#script .current');
+    return el ? Number(el.dataset.line) : -1;
+  });
+  const waitForLine = async (n, ms) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if ((await currentLine()) === n) return Date.now() - t0;
+      await sleep(25);
+    }
+    return -1;
+  };
+  const talk = (on) => p6.evaluate((v) => window.__talk(v), on);
+
+  await p6.goto(`${BASE}/index.html`);
+  await p6.getByRole('button', { name: 'Börja öva' }).click();
+  await p6.locator('#age-ok').check();
+  await p6.locator('#age-continue').click();
+  await p6.locator('.scene').first().click();
+  await p6.locator('#role-buttons button').first().click(); // första rollen, som har första repliken
+  await p6.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p6.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p6.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p6.locator('#partner-toggle').isVisible() && await p6.locator('#partner-on').isChecked(),
+    'Motspelaren: valet syns och är påslaget när mobilen har en svensk röst');
+  check(await p6.locator('#partner-no-voice').isHidden(), 'Motspelaren: ingen varning om saknad röst');
+
+  await p6.locator('#start-rec').click();
+  await p6.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  check(await p6.locator('#partner-box').isHidden(), 'Motspelaren: valet göms under tagningen');
+  check(await p6.locator('#next-line').isVisible(), 'Motspelaren: knappen Nästa replik syns under tagningen');
+  check((await currentLine()) === 0, 'Motspelaren: din första replik är markerad när tagningen börjar');
+
+  // Första repliken: användaren pratar i 2,5 s och tystnar.
+  await talk(true);
+  await sleep(2500);
+  await talk(false);
+  const gap = await waitForLine(1, 4000);
+  check(gap >= 700 && gap <= 1600, `Motspelaren svarar ${gap} ms efter att du har tystnat`);
+  const first = (await p6.evaluate(() => window.__spoken))[0] || {};
+  check(first.text === lines[1].text && first.voice === 'Alva' && first.lang === 'sv-SE',
+    `Motspelarens replik läses med mobilens svenska röst, inte en röst via nätet (${first.voice})`);
+  check((await waitForLine(2, 3000)) >= 0, 'Motspelaren: din nästa replik markeras när rösten har läst klart');
+
+  // Tredje repliken: en paus i spelet efter några ord, sedan resten.
+  await talk(true);
+  await sleep(600);
+  await talk(false);
+  await sleep(1800);
+  check((await currentLine()) === 2, 'Motspelaren: en paus på knappt 2 s mitt i din replik släpper inte fram motspelaren');
+  await p6.evaluate(() => { window.__speakMs = 30000; }); // nästa replik läses länge, så att Nästa replik kan testas
+  await talk(true);
+  await sleep(2000);
+  await talk(false);
+  check((await waitForLine(3, 3000)) >= 0, 'Motspelaren: när resten av repliken är sagd kommer motspelaren');
+
+  await sleep(300);
+  await p6.locator('#next-line').click();
+  check((await waitForLine(4, 1000)) >= 0, 'Nästa replik avbryter rösten och går till din replik');
+  check(!(await p6.evaluate(() => window.speechSynthesis.speaking)), 'Rösten tystnar när du trycker på Nästa replik');
+  for (let i = 4; i < lines.length; i++) {
+    await p6.locator('#next-line').click();
+    if (i + 1 < lines.length) await waitForLine(i + 1, 1000);
+  }
+  await p6.locator('#partner-done').waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+  check(await p6.locator('#partner-done').isVisible(), 'När scenen är slut står det att du kan trycka på Stoppa');
+  check(await p6.locator('#next-line').isHidden() && (await currentLine()) === -1, 'När scenen är slut finns ingen markering och ingen Nästa replik');
+  const spokenTexts = (await p6.evaluate(() => window.__spoken)).map((s) => s.text);
+  const theirs = lines.filter((l) => l.roll !== lines[0].roll).map((l) => l.text);
+  check(JSON.stringify(spokenTexts) === JSON.stringify(theirs), 'Rösten läste bara motspelarens repliker, i rätt ordning');
+  check(await p6.locator('#stop-rec').isVisible(), 'Inspelningen pågår tills du själv trycker på Stoppa');
+  await p6.locator('#stop-rec').click();
+  await p6.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  check(((await p6.locator('#playback').getAttribute('src')) || '').startsWith('blob:'), 'Tagningen med motspelaren går att titta på');
+
+  // Ta om utan motspelare: som förut, ingen röst och ingen markering.
+  await p6.getByRole('button', { name: 'Ta om' }).click();
+  await p6.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p6.locator('#partner-box').isVisible() && await p6.locator('#partner-done').isHidden() && (await currentLine()) === -1,
+    'Ta om: valet syns igen och scenen börjar om');
+  await p6.locator('#partner-on').uncheck();
+  await p6.locator('#start-rec').click();
+  await p6.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  await sleep(1500);
+  check((await currentLine()) === -1 && (await p6.evaluate(() => window.__spoken.length)) === theirs.length && await p6.locator('#next-line').isHidden(),
+    'Avstängd motspelare: ingen röst och ingen markering');
+  await p6.locator('#stop-rec').click();
+  await p6.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+
+  // Utan svensk röst i mobilen.
+  await p6.evaluate(() => { window.__voices = window.__voices.filter((v) => v.name !== 'Alva'); });
+  await p6.getByRole('button', { name: 'Ta om' }).click();
+  await p6.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p6.locator('#partner-toggle').isHidden() && await p6.locator('#partner-no-voice').isVisible(),
+    'Utan svensk röst i mobilen står det att motspelarens repliker bara visas som text');
+  check(p6errors.length === 0, `Inga fel med motspelaren (${p6errors.join(' | ') || 'inga'})`);
+  const p6odd = p6requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
+  check(p6odd.length === 0, `Motspelaren skickar inget över nätet (${p6odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  await p6ctx.close();
 } finally {
   await browser.close();
   server.kill();

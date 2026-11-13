@@ -5,6 +5,7 @@
 
 import { SCENES } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
+import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
 const MAX_SECONDS = 180;
@@ -39,7 +40,16 @@ const state = {
   stopReason: '',
   blob: null,
   blobUrl: null,
-  file: null
+  file: null,
+  // Motspelaren
+  voice: null,
+  player: null,
+  vad: null,
+  levelTimer: 0,
+  levelTicks: 0,
+  listening: null,
+  partnerSpeaking: false,
+  utterance: null
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -378,10 +388,11 @@ function renderScript() {
   intro.className = 'situation';
   intro.textContent = scene.situation;
   box.append(intro);
-  for (const line of scene.repliker) {
+  for (const [index, line] of scene.repliker.entries()) {
     const p = document.createElement('p');
     const mine = line.roll === state.role;
     p.className = mine ? 'mine' : 'theirs';
+    p.dataset.line = String(index);
     const who = document.createElement('span');
     who.className = 'who';
     who.textContent = mine ? t('record_you', { name: names[line.roll] }) : names[line.roll];
@@ -422,6 +433,7 @@ async function toRecord() {
   if (!ok) return;
   attachPreview('#preview-record');
   renderScript();
+  resetPartner();
   $('#start-rec').hidden = false;
   $('#start-rec').disabled = false;
   $('#stop-rec').hidden = true;
@@ -432,11 +444,16 @@ async function toRecord() {
 async function startRecording() {
   const startButton = $('#start-rec');
   startButton.disabled = true;
+  ensureAudioContext();
+  const withPartner = partnerWanted();
+  if (withPartner) unlockSpeech(); // måste ske i själva trycket, före allt som väntar
   if (!streamIsLive()) {
     const ok = await startCamera();
     if (!ok) return;
     attachPreview('#preview-record');
   }
+  $('#partner-box').hidden = true;
+  if (withPartner) startLevelLoop(); // mäter bakgrundsljudet under nedräkningen
   await countdown(3);
 
   const mime = pickMime();
@@ -449,6 +466,7 @@ async function startRecording() {
     try {
       recorder = new MediaRecorder(state.stream);
     } catch {
+      stopPartner();
       showHelp('recorder');
       return;
     }
@@ -469,6 +487,7 @@ async function startRecording() {
   $('#rec-badge').hidden = false;
   updateRecTime();
   state.recTimer = setInterval(updateRecTime, 250);
+  if (withPartner) startPartner();
 }
 
 function updateRecTime() {
@@ -479,6 +498,7 @@ function updateRecTime() {
 
 function stopRecording(reason) {
   clearInterval(state.recTimer);
+  stopPartner();
   if (!state.stopReason) state.stopReason = reason || 'user';
   const recorder = state.recorder;
   if (recorder && recorder.state !== 'inactive') {
@@ -535,6 +555,172 @@ async function retake() {
   clearTake();
   await toRecord();
 }
+
+// ---------- Motspelaren ----------
+// Mobilens egen uppläsningsröst läser motspelarens repliker. Ljudnivån från
+// mikrofonen avgör när användaren har sagt sin replik. Logiken finns i partner.js.
+
+const synth = window.speechSynthesis || null;
+const LEVEL_MS = 50;
+const AFTER_PARTNER_MS = 400; // efterklang från rösten som inte ska räknas som tal
+
+function findSwedishVoice() {
+  if (!synth || typeof synth.getVoices !== 'function' || !window.SpeechSynthesisUtterance) return null;
+  let voices = [];
+  try { voices = synth.getVoices() || []; } catch { voices = []; }
+  // Bara röster som finns i mobilen. En röst som går via nätet skulle skicka replikerna iväg.
+  const swedish = voices.filter((v) => /^sv([-_]|$)/i.test(v.lang || '') && v.localService !== false);
+  return swedish.find((v) => v.default) || swedish[0] || null;
+}
+
+function updateVoice() {
+  state.voice = findSwedishVoice();
+  const found = !!state.voice;
+  $('#partner-toggle').hidden = !found;
+  $('#partner-note').hidden = !found;
+  $('#partner-no-voice').hidden = found;
+}
+
+const partnerWanted = () => !!state.voice && $('#partner-on').checked;
+
+function cancelSpeech() {
+  try { if (synth) synth.cancel(); } catch { /* inget att avbryta */ }
+}
+
+// iPhone läser bara upp text om uppläsningen startas av ett tryck. En tom
+// replik i trycket på Starta inspelning låser upp rösten för resten av tagningen.
+function unlockSpeech() {
+  try {
+    const u = new SpeechSynthesisUtterance('');
+    u.volume = 0;
+    synth.speak(u);
+  } catch { /* då står motspelarens repliker bara i texten */ }
+}
+
+function speakLine(text) {
+  return new Promise((resolve) => {
+    let done = false;
+    let timer = 0;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      state.partnerSpeaking = false;
+      resolve();
+    };
+    // Om rösten inte fungerar får användaren läsa repliken, ungefär så länge som den tar att säga.
+    const readInstead = () => {
+      clearTimeout(timer);
+      timer = setTimeout(finish, expectedMs(text));
+    };
+    // Reserv om webbläsaren aldrig säger att uppläsningen är klar.
+    timer = setTimeout(finish, text.length * 90 + 3000);
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.voice = state.voice;
+      u.lang = state.voice.lang;
+      u.onend = finish;
+      u.onerror = (e) => {
+        if (e && (e.error === 'canceled' || e.error === 'interrupted')) finish(); // Nästa replik eller Stoppa
+        else readInstead();
+      };
+      state.utterance = u; // Chrome tappar annars händelserna om objektet städas bort
+      state.partnerSpeaking = true;
+      synth.speak(u);
+    } catch {
+      readInstead();
+    }
+  });
+}
+
+function listenForLine(line, index) {
+  const afterPartner = index > 0 && state.scene.repliker[index - 1].roll !== state.role;
+  return new Promise((resolve) => {
+    // Utan ljudnivå går scenen vidare när användaren trycker på Nästa replik.
+    if (!state.vad) return;
+    state.vad.startLine(line.text, afterPartner ? AFTER_PARTNER_MS : 0);
+    state.listening = resolve;
+  });
+}
+
+function levelTick() {
+  state.levelTicks += 1;
+  const ctx = state.audioCtx;
+  if (state.levelTicks % 20 === 0 && ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  const levels = readLevels();
+  if (!levels || !state.vad) return;
+  if (state.listening) {
+    if (state.vad.push(levels.rmsDb) === 'done') {
+      const resolve = state.listening;
+      state.listening = null;
+      resolve();
+    }
+  } else if (!state.partnerSpeaking) {
+    state.vad.observe(levels.rmsDb);
+  }
+}
+
+function startLevelLoop() {
+  clearInterval(state.levelTimer);
+  state.vad = createVoiceDetector();
+  state.listening = null;
+  state.levelTicks = 0;
+  state.levelTimer = setInterval(levelTick, LEVEL_MS);
+}
+
+function markLine(index) {
+  for (const p of document.querySelectorAll('#script [data-line]')) {
+    const current = Number(p.dataset.line) === index;
+    p.classList.toggle('current', current);
+    if (current) {
+      p.setAttribute('aria-current', 'true');
+      p.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else {
+      p.removeAttribute('aria-current');
+    }
+  }
+}
+
+function startPartner() {
+  $('#next-line').hidden = false;
+  state.player = new ScenePlayer(state.scene.repliker, state.role, {
+    speak: speakLine,
+    listen: listenForLine,
+    cancelSpeech,
+    onLine: (index) => {
+      state.listening = null;
+      markLine(index);
+    },
+    onEnd: () => {
+      markLine(-1);
+      $('#next-line').hidden = true;
+      $('#partner-done').hidden = false;
+    }
+  });
+  state.player.play();
+}
+
+function stopPartner() {
+  clearInterval(state.levelTimer);
+  if (state.player) state.player.stop();
+  else cancelSpeech();
+  state.player = null;
+  state.vad = null;
+  state.listening = null;
+  state.partnerSpeaking = false;
+  state.utterance = null;
+  $('#next-line').hidden = true;
+  markLine(-1);
+}
+
+function resetPartner() {
+  stopPartner();
+  updateVoice();
+  $('#partner-box').hidden = false;
+  $('#partner-done').hidden = true;
+}
+
+if (synth && typeof synth.addEventListener === 'function') synth.addEventListener('voiceschanged', updateVoice);
 
 // ---------- Spara ----------
 
@@ -640,6 +826,7 @@ document.addEventListener('click', (event) => {
     case 'run-check': runCheck(); break;
     case 'to-record': toRecord(); break;
     case 'start-rec': startRecording(); break;
+    case 'next-line': if (state.player) state.player.skip(); break;
     case 'stop-rec': stopRecording('user'); break;
     case 'retake': retake(); break;
     case 'to-save': toSave(); break;
@@ -657,8 +844,10 @@ document.addEventListener('visibilitychange', () => {
 
 window.addEventListener('pagehide', () => {
   stopCamera();
+  cancelSpeech();
   if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
 });
 
 renderScenes();
+updateVoice();
 show('start');

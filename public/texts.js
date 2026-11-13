@@ -122,6 +122,13 @@ export const sv = {
   record_you: 'Du, {name}',
   record_max_note: 'En tagning kan vara högst 3 minuter.',
 
+  // Motspelaren: mobilens egen röst läser den andra rollens repliker.
+  partner_toggle: 'Mobilen läser motspelarens repliker högt',
+  partner_note: 'Rösten är mobilens inbyggda uppläsningsröst och kan höras i inspelningen, som en motspelare bakom kameran. Nästa replik kommer när du har sagt din, eller när du trycker på Nästa replik.',
+  partner_no_voice: 'Mobilen har ingen svensk uppläsningsröst som sidan kan använda, så motspelarens repliker står bara i texten.',
+  partner_next: 'Nästa replik',
+  partner_done: 'Scenen är slut. Tryck på Stoppa när du är klar.',
+
   // ---- 6. Titta ----
   review_title: 'Titta på tagningen',
   review_playback_error: 'Uppspelningen fungerar inte i den här webbläsaren, men du kan ändå spara videon.',

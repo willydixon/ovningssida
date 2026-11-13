@@ -92,9 +92,21 @@
       <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
       <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / 3:00</div>
     </div>
-    <div class="row">
-      <button type="button" class="primary" data-action="start-rec" id="start-rec">{{record_button_start}}</button>
-      <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>{{record_button_stop}}</button>
+    <div id="partner-box">
+      <label class="check" id="partner-toggle">
+        <input type="checkbox" id="partner-on" checked>
+        <span>{{partner_toggle}}</span>
+      </label>
+      <p class="small" id="partner-note">{{partner_note}}</p>
+      <p class="small" id="partner-no-voice" hidden>{{partner_no_voice}}</p>
+    </div>
+    <div class="controls">
+      <div class="row">
+        <button type="button" class="primary" data-action="start-rec" id="start-rec">{{record_button_start}}</button>
+        <button type="button" class="secondary" data-action="next-line" id="next-line" hidden>{{partner_next}}</button>
+        <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>{{record_button_stop}}</button>
+      </div>
+      <p class="prompt" id="partner-done" aria-live="polite" hidden>{{partner_done}}</p>
     </div>
     <div class="script" id="script" aria-label="{{record_script_label}}"></div>
     <p class="small">{{record_max_note}}</p>

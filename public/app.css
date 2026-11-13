@@ -11,6 +11,7 @@
   --warn: #9a6a00;
   --bad: #b3261e;
   --focus: #2b62c9;
+  --highlight: #f6e0d8;
   --radius: 12px;
 }
 @media (prefers-color-scheme: dark) {
@@ -26,6 +27,7 @@
     --warn: #e2b24c;
     --bad: #f08a80;
     --focus: #8fb2ff;
+    --highlight: #4a342b;
   }
 }
 
@@ -227,6 +229,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .script .who { display: block; font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
 .script .mine { font-size: 1.15rem; font-weight: 600; }
 .script .theirs { color: var(--quiet); }
+
+/* Motspelaren: knapparna stannar överst när sidan rullar, och repliken som pågår markeras. */
+.controls { background: var(--bg); position: sticky; top: 0; z-index: 2; }
+.controls .row { margin: 0; padding: 12px 0; }
+#partner-done { margin: 0 0 12px; }
+.script p { border-radius: 6px; transition: background-color .2s, box-shadow .2s; }
+.script p.current { background: var(--highlight); box-shadow: 0 0 0 8px var(--highlight); }
 
 #playback { background: #000; border-radius: var(--radius); margin: 16px 0; max-height: 60vh; width: 100%; }
 #download-link { margin: 12px 0; width: 100%; }

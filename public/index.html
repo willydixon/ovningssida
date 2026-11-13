@@ -92,9 +92,21 @@
       <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
       <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / 3:00</div>
     </div>
-    <div class="row">
-      <button type="button" class="primary" data-action="start-rec" id="start-rec">Starta inspelning</button>
-      <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>Stoppa</button>
+    <div id="partner-box">
+      <label class="check" id="partner-toggle">
+        <input type="checkbox" id="partner-on" checked>
+        <span>Mobilen läser motspelarens repliker högt</span>
+      </label>
+      <p class="small" id="partner-note">Rösten är mobilens inbyggda uppläsningsröst och kan höras i inspelningen, som en motspelare bakom kameran. Nästa replik kommer när du har sagt din, eller när du trycker på Nästa replik.</p>
+      <p class="small" id="partner-no-voice" hidden>Mobilen har ingen svensk uppläsningsröst som sidan kan använda, så motspelarens repliker står bara i texten.</p>
+    </div>
+    <div class="controls">
+      <div class="row">
+        <button type="button" class="primary" data-action="start-rec" id="start-rec">Starta inspelning</button>
+        <button type="button" class="secondary" data-action="next-line" id="next-line" hidden>Nästa replik</button>
+        <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>Stoppa</button>
+      </div>
+      <p class="prompt" id="partner-done" aria-live="polite" hidden>Scenen är slut. Tryck på Stoppa när du är klar.</p>
     </div>
     <div class="script" id="script" aria-label="Scenens repliker"></div>
     <p class="small">En tagning kan vara högst 3 minuter.</p>

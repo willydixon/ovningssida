@@ -61,6 +61,8 @@ for (const s of SCENES) {
   check(Array.isArray(s.roller) && s.roller.length === 2, `${where}: två roller`);
   const roleIds = new Set(s.roller.map((r) => r.id));
   check(Array.isArray(s.repliker) && s.repliker.length >= 6 && s.repliker.every((l) => roleIds.has(l.roll) && l.text.trim()), `${where}: repliker hör till rollerna`);
+  // Motspelaren lyssnar efter en replik i taget, så två repliker i rad av samma roll slås ihop till en.
+  check(s.repliker.every((l, i) => i === 0 || l.roll !== s.repliker[i - 1].roll), `${where}: replikerna växlar mellan rollerna`);
   check(['utkast', 'godkand'].includes(s.status), `${where}: status är utkast eller godkand`);
   if (s.status === 'godkand') {
     check(!!s.godkand_av && !!s.godkand_datum, `${where}: godkänd scen anger vem och när`);

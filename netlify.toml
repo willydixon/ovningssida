@@ -1,4 +1,5 @@
 # Statisk sida utan byggsteg. Allt som publiceras ligger i public/.
+# Räknaren och statistiken är Netlify-funktioner i netlify/functions/.
 [build]
   publish = "public"
 
@@ -8,7 +9,8 @@
     # Sidan ska inte synas i sökmotorer förrän den öppnas.
     X-Robots-Tag = "noindex"
     # connect-src 'none' stoppar alla nätverksanrop från skriptet, så ingen video kan skickas.
-    Content-Security-Policy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'"
+    # form-action 'self' låter anmälan och frågorna skickas till den egna sidan, aldrig någon annanstans.
+    Content-Security-Policy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'none'"
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(), usb=()"
     Referrer-Policy = "no-referrer"
     X-Content-Type-Options = "nosniff"

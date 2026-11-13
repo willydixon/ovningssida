@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from '../public/check.js';
 import { SCENES } from '../public/scenes.js';
 import { sv, t } from '../public/texts.js';
-import { renderIndex, renderManifest, TEMPLATE, INDEX, MANIFEST } from '../tools/render-pages.mjs';
+import { renderPage, renderManifest, readTemplates, PUBLIC, MANIFEST } from '../tools/render-pages.mjs';
+import path from 'node:path';
 
 const failures = [];
 const check = (ok, message) => {
@@ -70,10 +71,12 @@ for (const s of SCENES) {
 }
 
 // ---- Texterna ----
-// Alla texter ligger i texts.js. index.html och manifest.json skapas från dem.
-const template = readFileSync(TEMPLATE, 'utf8');
-check(renderIndex(template) === readFileSync(INDEX, 'utf8'),
-  'index.html är skapad från texts.js (kör annars node tools/render-pages.mjs)');
+// Alla texter ligger i texts.js. Sidorna i templates/ och manifest.json skapas från dem.
+const templates = await readTemplates();
+for (const [name, template] of templates) {
+  check(renderPage(template) === readFileSync(path.join(PUBLIC, name), 'utf8'),
+    `${name} är skapad från texts.js (kör annars node tools/render-pages.mjs)`);
+}
 check(renderManifest() === readFileSync(MANIFEST, 'utf8'),
   'manifest.json är skapad från texts.js (kör annars node tools/render-pages.mjs)');
 const code = ['public/app.js', 'public/check.js', 'tools/render-pages.mjs']
@@ -81,7 +84,7 @@ const code = ['public/app.js', 'public/check.js', 'tools/render-pages.mjs']
 const usedKeys = new Set([
   ...[...code.matchAll(/'([a-z]+(?:_[a-z0-9]+)+)'/g)].map((m) => m[1]),
   ...[...code.matchAll(/texts\.([a-z]+(?:_[a-z0-9]+)*)/g)].map((m) => m[1]).filter((k) => k !== 'js'), // inte filnamnet texts.js
-  ...[...template.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1])
+  ...templates.flatMap(([, template]) => [...template.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))
 ]);
 const missingKeys = [...usedKeys].filter((k) => !(k in sv));
 const unusedKeys = Object.keys(sv).filter((k) => !usedKeys.has(k));

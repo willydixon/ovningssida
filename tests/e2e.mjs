@@ -160,6 +160,65 @@ try {
   check(instErrors.length === 0, `Chrome kan installera sidan som app (${instErrors.join(', ') || 'inga hinder'})`);
   check(appErrors.length === 0, `Inga fel när app-filen läses (${appErrors.join(' | ') || 'inga'})`);
   await app.close();
+
+  // ---- 5. Prissida, anmälan och frågor ----
+  // Räknaren körs här med en lagring i minnet i stället för Netlify Blobs.
+  const { handle: countHit } = await import('../netlify/functions/raknare.mjs');
+  const hits = new Map();
+  const memory = { async set(key, value) { hits.set(key, value); } };
+  const p5ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await p5ctx.route(/\/r\?/, async (route) => {
+    const res = await countHit(new Request(route.request().url()), memory);
+    const headers = Object.fromEntries(res.headers.entries());
+    if (headers.location) headers.location = new URL(headers.location, BASE).href;
+    await route.fulfill({ status: res.status, headers, body: Buffer.from(await res.arrayBuffer()) });
+  });
+  const p5 = await p5ctx.newPage();
+  const p5errors = [];
+  const p5requests = [];
+  p5.on('console', (m) => { if (m.type() === 'error') p5errors.push(m.text()); });
+  p5.on('pageerror', (e) => p5errors.push(String(e)));
+  p5.on('request', (r) => p5requests.push({ url: r.url(), method: r.method() }));
+
+  await p5.goto(`${BASE}/pris.html`);
+  await p5.waitForLoadState('networkidle');
+  check([...hits.keys()].some((k) => k.includes('/pris_visning/')), 'Prissidan: visningen räknas');
+  await p5.getByRole('link', { name: 'Meddela mig när jag kan köpa' }).click();
+  await p5.waitForURL(/anmalan\.html\?fran=pris/);
+  check([...hits.keys()].some((k) => k.includes('/pris_meddela/')), 'Prissidan: klicket räknas och leder till anmälan');
+  check((await p5.locator('#fran').inputValue()) === 'pris', 'Anmälan: källan från länken fylls i');
+
+  const form = p5.locator('form[name="anmalan"]');
+  const attrs = await form.evaluate((f) => [f.getAttribute('method'), f.getAttribute('action'), f.getAttribute('data-netlify'), f.getAttribute('netlify-honeypot')]);
+  check(attrs.join(' ') === 'POST /tack.html true bot-field', `Anmälan: formuläret går till Netlify Forms med honungsfälla (${attrs.join(' ')})`);
+  check(await form.evaluate((f) => !f.checkValidity()), 'Anmälan: går inte att skicka utan e-post, 18 år och samtycke');
+  await p5.fill('input[name="epost"]', 'test@example.com');
+  await p5.check('input[name="vuxen"]');
+  check(await form.evaluate((f) => !f.checkValidity()), 'Anmälan: samtycket krävs');
+  await p5.check('input[name="samtycke"]');
+  check(await form.evaluate((f) => f.checkValidity()), 'Anmälan: går att skicka med e-post, 18 år och samtycke');
+  check(await p5.locator('.honeypot').isHidden(), 'Anmälan: honungsfällan syns inte');
+
+  await p5.goto(`${BASE}/anmalan.html?fran=%3Cscript%3E`);
+  check((await p5.locator('#fran').inputValue()) === '', 'Anmälan: en konstig källa i länken ignoreras');
+  await p5.goto(`${BASE}/anmalan.html?fran=tiktok`);
+  check((await p5.locator('select[name="kalla"]').inputValue()) === 'tiktok', 'Anmälan: TikTok väljs i förväg när länken kommer därifrån');
+
+  await p5.goto(`${BASE}/fragor.html`);
+  const qform = p5.locator('form[name="fragor"]');
+  const qattrs = await qform.evaluate((f) => [f.getAttribute('action'), f.getAttribute('data-netlify')]);
+  check(qattrs.join(' ') === '/fragor-tack.html true', 'Frågorna: formuläret går till Netlify Forms');
+  check((await p5.locator('form[name="fragor"] textarea').count()) === 6, 'Frågorna: sex frågor att svara på i text');
+  check(await qform.evaluate((f) => !f.checkValidity()), 'Frågorna: går inte att skicka utan 18 år och samtycke');
+
+  for (const f of ['tack', 'fragor-tack']) {
+    const r = await p5.goto(`${BASE}/${f}.html`);
+    check(r && r.ok(), `${f}.html laddas`);
+  }
+  check(p5errors.length === 0, `Inga fel på de nya sidorna (${p5errors.join(' | ') || 'inga'})`);
+  check(p5requests.every((r) => r.method === 'GET' && r.url.startsWith(BASE)), 'De nya sidorna skickar inget och anropar inga andra adresser');
+  check((await p5ctx.cookies()).length === 0, 'De nya sidorna sätter inga kakor');
+  await p5ctx.close();
 } finally {
   await browser.close();
   server.kill();

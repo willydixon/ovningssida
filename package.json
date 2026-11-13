@@ -1,0 +1,13 @@
+{
+  "name": "ovningssida",
+  "private": true,
+  "type": "module",
+  "description": "Övningssida för skådespelare. Statisk sida i public/ och två små Netlify-funktioner för räknaren.",
+  "scripts": {
+    "test": "sh tests/run.sh",
+    "render": "node tools/render-pages.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.1.9"
+  }
+}

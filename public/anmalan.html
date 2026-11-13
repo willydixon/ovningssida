@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'self'; object-src 'none'">
+<meta name="color-scheme" content="light dark">
+<title>Anmälan, Övningssidan</title>
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1b1a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Övningssidan">
+<script type="module" src="anmalan.js"></script>
+</head>
+<body>
+<div class="testband">Testversion. Texterna är utkast.</div>
+<main class="page">
+<a class="back" href="index.html">← Tillbaka till övningen</a>
+<h1>Få ett mejl när något nytt finns</h1>
+<p class="lead">Vi mejlar när scenpaketen går att köpa och när det kommer nya scener. Du kan när som helst be oss ta bort din adress.</p>
+<!-- Netlify Forms tar emot anmälan. Inget skript skickar något: formuläret skickas som en vanlig sida. -->
+<form class="form" name="anmalan" method="POST" action="/tack.html" data-netlify="true" netlify-honeypot="bot-field">
+  <input type="hidden" name="form-name" value="anmalan">
+  <input type="hidden" name="fran" id="fran" value="">
+  <p class="honeypot" hidden><label>Lämna det här fältet tomt <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+  <label class="field">
+    <span>Din e-post</span>
+    <input type="email" name="epost" autocomplete="email" required>
+  </label>
+  <label class="field">
+    <span>Var hörde du om oss?</span>
+    <select name="kalla">
+      <option value="">Välj</option>
+      <option value="tiktok">TikTok</option>
+      <option value="instagram">Instagram</option>
+      <option value="google">Google</option>
+      <option value="van">Från en vän</option>
+      <option value="annat">Annat</option>
+    </select>
+  </label>
+  <label class="check">
+    <input type="checkbox" name="android" value="ja">
+    <span>Jag vill testa appen för Android när den finns</span>
+  </label>
+  <label class="check">
+    <input type="checkbox" name="vuxen" value="ja" required>
+    <span>Jag är 18 år eller äldre</span>
+  </label>
+  <label class="check">
+    <input type="checkbox" name="samtycke" value="ja" required>
+    <span>Ja, ni får spara min e-post och mejla mig om övningssidan.</span>
+  </label>
+  <p class="small"><a href="integritet.html">Så hanterar vi dina uppgifter</a></p>
+  <button type="submit" class="primary">Anmäl mig</button>
+</form>
+</main>
+<footer>
+  <nav aria-label="Om sidan">
+    <a href="pris.html">Scenpaket</a>
+    <a href="anmalan.html">Anmäl dig</a>
+    <a href="om.html">Om sidan</a>
+    <a href="ai.html">Så används AI</a>
+    <a href="integritet.html">Integritet</a>
+    <a href="villkor.html">Villkor</a>
+    <a href="kontakt.html">Kontakt</a>
+  </nav>
+</footer>
+</body>
+</html>

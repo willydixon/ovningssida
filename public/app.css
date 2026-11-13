@@ -112,7 +112,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   min-height: 56px;
   padding: 12px 16px;
 }
-.check input { height: 24px; width: 24px; margin: 0; accent-color: var(--accent); }
+.check input { height: 24px; width: 24px; margin: 0; accent-color: var(--accent); flex: none; }
 
 .scene-list { display: grid; gap: 12px; margin: 16px 0; }
 .scene {
@@ -239,3 +239,29 @@ footer a, .page a { color: var(--ink); }
 .page { max-width: 640px; }
 .page .back { display: inline-block; margin-bottom: 16px; }
 .results li.neutral { border-left-color: var(--line); }
+
+/* Fas 2: prissida och formulär */
+.page a.button { margin: 8px 0; }
+.page a.button.primary { color: var(--accent-ink); }
+.price { font-size: 1.4rem; font-weight: 700; margin: 8px 0 16px; }
+.pixel { height: 1px; left: -9999px; position: absolute; width: 1px; }
+.form { margin: 16px 0 24px; }
+.field { display: grid; font-weight: 600; gap: 6px; margin: 12px 0; }
+.field input, .field select, .field textarea {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  min-height: 48px;
+  padding: 10px 12px;
+  width: 100%;
+}
+.field textarea { min-height: 96px; resize: vertical; }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.form .check { margin: 10px 0; }
+.form button { margin-top: 8px; width: 100%; }

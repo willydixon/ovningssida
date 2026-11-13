@@ -5,6 +5,7 @@
 
 import { SCENES } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
+import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
 const MAX_SECONDS = 180;
 
@@ -63,9 +64,9 @@ async function copyLink() {
   const status = $('[data-copy-status]');
   try {
     await navigator.clipboard.writeText(location.href);
-    status.textContent = 'Länken är kopierad. Klistra in den i Safari eller Chrome.';
+    status.textContent = t('inapp_copied');
   } catch {
-    status.textContent = `Kopiera länken här: ${location.href}`;
+    status.textContent = t('inapp_copy_manual', { url: location.href });
   }
 }
 
@@ -78,9 +79,9 @@ $('#age-ok').addEventListener('change', (e) => {
 // ---------- Scener ----------
 
 function formatLength(seconds) {
-  if (seconds < 60) return `${seconds} s`;
+  if (seconds < 60) return t('length_seconds', { n: seconds });
   const minutes = Math.round((seconds / 60) * 2) / 2;
-  return `${String(minutes).replace('.', ',')} min`;
+  return t('length_minutes', { n: String(minutes).replace('.', ',') });
 }
 
 function renderScenes() {
@@ -96,7 +97,7 @@ function renderScenes() {
     if (scene.status !== 'godkand') {
       const badge = document.createElement('span');
       badge.className = 'badge';
-      badge.textContent = 'Utkast';
+      badge.textContent = t('scene_draft_badge');
       title.append(' ', badge);
     }
 
@@ -105,10 +106,10 @@ function renderScenes() {
 
     const meta = document.createElement('span');
     meta.className = 'meta';
-    const approved = scene.godkand_av
-      ? `Skriven med AI-stöd, godkänd av ${scene.godkand_av}`
-      : 'Skriven med AI-stöd, inte granskad än';
-    meta.textContent = `Cirka ${formatLength(scene.langd_sekunder)} · ${scene.roller.length} roller · ${approved}`;
+    const approval = scene.godkand_av
+      ? t('scene_approved_by', { name: scene.godkand_av })
+      : t('scene_not_reviewed');
+    meta.textContent = t('scene_meta', { length: formatLength(scene.langd_sekunder), roles: scene.roller.length, approval });
 
     button.append(title, situation, meta);
     button.addEventListener('click', () => pickScene(scene));
@@ -127,7 +128,7 @@ function pickScene(scene) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'primary';
-    b.textContent = `Spela ${role.namn}`;
+    b.textContent = t('role_button', { name: role.namn });
     b.addEventListener('click', () => chooseRole(role.id));
     buttons.append(b);
   }
@@ -269,9 +270,9 @@ function startMeter() {
 function resetCheck() {
   $('#check-results').hidden = true;
   $('#check-results').textContent = '';
-  $('#run-check').textContent = 'Starta kontrollen';
+  $('#run-check').textContent = t('check_button_start');
   $('#run-check').disabled = false;
-  $('#check-prompt').textContent = 'Tryck på Starta kontrollen. Var först tyst i två sekunder och säg sedan din första replik med vanlig röst.';
+  $('#check-prompt').textContent = t('check_prompt_start');
 }
 
 function sample(ms) {
@@ -329,37 +330,38 @@ async function runCheck() {
   list.textContent = '';
 
   if (!state.analyser) {
-    prompt.textContent = 'Ljudet kunde inte mätas i den här webbläsaren. Kontrollera ljuset och bilden själv.';
+    prompt.textContent = t('check_prompt_no_audio');
   } else {
-    prompt.textContent = 'Var tyst i två sekunder …';
+    prompt.textContent = t('check_prompt_silence');
     const noise = await sample(2000);
-    prompt.textContent = 'Säg nu din första replik med vanlig röst …';
+    prompt.textContent = t('check_prompt_speak');
     const speech = await sample(4000);
     const speechDb = percentile(speech.rms, 0.9);
     const noiseDb = percentile(noise.rms, 0.5);
     const peakDb = Math.max(speech.peak, noise.peak);
-    addResult(list, 'Ljud', rateSpeech(speechDb), `${Math.round(speechDb)} dB`);
-    addResult(list, 'Toppar', ratePeaks(peakDb, speech.clipped || noise.clipped), `${Math.round(peakDb)} dB`);
-    addResult(list, 'Bakgrund', rateNoise(noiseDb), `${Math.round(noiseDb)} dB`);
+    const db = (value) => t('check_value_db', { n: Math.round(value) });
+    addResult(list, t('check_name_speech'), rateSpeech(speechDb), db(speechDb));
+    addResult(list, t('check_name_peaks'), ratePeaks(peakDb, speech.clipped || noise.clipped), db(peakDb));
+    addResult(list, t('check_name_noise'), rateNoise(noiseDb), db(noiseDb));
   }
 
   const light = measureLight($('#preview-check'));
-  addResult(list, 'Ljus', rateLight(light), light ? `${Math.round(light.mean)} av 255` : '');
+  addResult(list, t('check_name_light'), rateLight(light), light ? t('check_value_light', { n: Math.round(light.mean) }) : '');
 
   const frame = document.createElement('li');
   frame.className = 'neutral';
   const head = document.createElement('span');
   head.className = 'label';
-  head.textContent = 'Bildutsnitt: kontrollera själv';
+  head.textContent = t('check_frame_label');
   const advice = document.createElement('span');
   advice.className = 'advice';
-  advice.textContent = 'Ansiktet och axlarna ska vara inom ramen, med lite luft ovanför huvudet.';
+  advice.textContent = t('check_frame_advice');
   frame.append(head, advice);
   list.append(frame);
 
   list.hidden = false;
-  prompt.textContent = 'Klart. Rådet gäller bara tekniken, inte ditt spel.';
-  button.textContent = 'Kör kontrollen igen';
+  prompt.textContent = t('check_prompt_done');
+  button.textContent = t('check_button_again');
   button.disabled = false;
   state.checking = false;
 }
@@ -382,7 +384,7 @@ function renderScript() {
     p.className = mine ? 'mine' : 'theirs';
     const who = document.createElement('span');
     who.className = 'who';
-    who.textContent = mine ? `Du, ${names[line.roll]}` : names[line.roll];
+    who.textContent = mine ? t('record_you', { name: names[line.roll] }) : names[line.roll];
     p.append(who, document.createTextNode(line.text));
     box.append(p);
   }
@@ -503,13 +505,14 @@ function onRecordingStopped() {
 
   const note = $('#review-note');
   const reasons = {
-    hidden: 'Inspelningen stoppades när du lämnade sidan. Du kan titta på det som hann spelas in, eller ta om.',
-    ended: 'Kameran eller mikrofonen stängdes av, till exempel av ett samtal. Du kan titta på det som hann spelas in, eller ta om.',
-    error: 'Något gick fel under inspelningen. Du kan titta på det som hann spelas in, eller ta om.',
-    max: 'Tagningen stoppades efter 3 minuter, som är maxlängden.'
+    hidden: 'stopped_hidden',
+    ended: 'stopped_ended',
+    error: 'stopped_error',
+    max: 'stopped_max'
   };
-  note.textContent = reasons[state.stopReason] || '';
-  note.hidden = !reasons[state.stopReason];
+  const reason = reasons[state.stopReason];
+  note.textContent = reason ? t(reason) : '';
+  note.hidden = !reason;
 
   const playback = $('#playback');
   $('#playback-error').hidden = true;
@@ -544,7 +547,7 @@ function stamp() {
 function toSave() {
   if (!state.blob) return;
   const ext = state.blob.type.includes('webm') ? 'webm' : 'mp4';
-  const name = `tagning-${stamp()}.${ext}`;
+  const name = `${t('file_prefix')}-${stamp()}.${ext}`;
   try {
     state.file = new File([state.blob], name, { type: state.blob.type });
   } catch {
@@ -568,62 +571,34 @@ async function share() {
   const status = $('#save-status');
   try {
     await navigator.share({ files: [state.file] });
-    status.textContent = 'Klart. Kontrollera att videon finns där du sparade den.';
+    status.textContent = t('save_shared');
   } catch (err) {
     if (err && err.name === 'AbortError') return;
-    status.textContent = 'Delningen fungerade inte. Tryck på Ladda ned videon i stället.';
+    status.textContent = t('save_share_failed');
   }
 }
 
 // ---------- Hjälp vid fel ----------
 
+// Rubrik först, sedan stycken. Texterna ligger i texts.js.
 const HELP = {
-  NotAllowedError: {
-    title: 'Kameran eller mikrofonen är blockerad',
-    lines: [
-      'Sidan behöver tillåtelse att använda kameran och mikrofonen. Inget spelas in förrän du själv startar.',
-      'iPhone med Safari: tryck på aA i adressfältet, välj Webbplatsinställningar och tillåt Kamera och Mikrofon.',
-      'Android med Chrome: tryck på ikonen till vänster om adressen, välj Behörigheter och tillåt Kamera och Mikrofon.',
-      'Tryck sedan på Försök igen.'
-    ]
-  },
-  NotFoundError: {
-    title: 'Ingen kamera hittades',
-    lines: ['Enheten verkar sakna kamera eller mikrofon. Prova med en mobil.']
-  },
-  NotReadableError: {
-    title: 'Kameran används av något annat',
-    lines: ['Stäng andra appar som använder kameran, till exempel ett videosamtal, och tryck på Försök igen.']
-  },
-  unsupported: {
-    title: 'Webbläsaren kan inte spela in',
-    lines: [
-      'Öppna sidan i Safari på iPhone eller i Chrome på Android.',
-      'Inbyggda webbläsare i appar som TikTok och Instagram stöder ofta inte inspelning. Tryck på menyn i appen och välj att öppna i webbläsaren.'
-    ]
-  },
-  recorder: {
-    title: 'Inspelningen kunde inte starta',
-    lines: ['Webbläsaren stöder inte inspelning av video. Prova Safari på iPhone eller Chrome på Android.']
-  },
-  empty: {
-    title: 'Tagningen blev tom',
-    lines: ['Inget hann spelas in. Tryck på Försök igen. Om det händer igen, öppna sidan i Safari eller Chrome.']
-  },
-  default: {
-    title: 'Kameran kunde inte starta',
-    lines: ['Något stoppade kameran. Stäng andra appar som använder kameran och tryck på Försök igen.']
-  }
+  NotAllowedError: ['help_blocked_title', 'help_blocked_1', 'help_blocked_2', 'help_blocked_3', 'help_blocked_4'],
+  NotFoundError: ['help_no_camera_title', 'help_no_camera_1'],
+  NotReadableError: ['help_busy_title', 'help_busy_1'],
+  unsupported: ['help_unsupported_title', 'help_unsupported_1', 'help_unsupported_2'],
+  recorder: ['help_recorder_title', 'help_recorder_1'],
+  empty: ['help_empty_title', 'help_empty_1'],
+  default: ['help_default_title', 'help_default_1']
 };
 
 function showHelp(key) {
-  const help = HELP[key] || (key === 'SecurityError' || key === 'TypeError' ? HELP.unsupported : HELP.default);
-  $('#h-help').textContent = help.title;
+  const [title, ...lines] = HELP[key] || (key === 'SecurityError' || key === 'TypeError' ? HELP.unsupported : HELP.default);
+  $('#h-help').textContent = t(title);
   const box = $('#help-text');
   box.textContent = '';
-  for (const line of help.lines) {
+  for (const line of lines) {
     const p = document.createElement('p');
-    p.textContent = line;
+    p.textContent = t(line);
     box.append(p);
   }
   show('help');

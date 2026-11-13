@@ -1,6 +1,9 @@
 // Teknikkollens mått och gränser. Rena funktioner utan sidoeffekter, så att de
 // kan testas utan kamera. Gränserna är startvärden som kalibreras på riktiga
 // mobiler. Toppgränsen kommer från ACX krav på ljudböcker, resten är mina val.
+// Rubrikerna och råden ligger i texts.js.
+
+import { t } from './texts.js';
 
 export const LIMITS = {
   speech: { greenLow: -28, greenHigh: -12, yellowLow: -36 },
@@ -47,30 +50,32 @@ export function lumaStats(rgba) {
 
 // Varje bedömning ger [nivå, rubrik, råd]. Nivån är good, warn eller bad.
 
+const rating = (level, label, advice) => [level, t(label), t(advice)];
+
 export function rateSpeech(db) {
-  if (db < LIMITS.speech.yellowLow) return ['bad', 'För lågt ljud', 'Gå närmare mobilen, tala med vanlig röst och kontrollera att inget täcker mikrofonen.'];
-  if (db < LIMITS.speech.greenLow) return ['warn', 'Lite lågt ljud', 'Gå lite närmare mobilen eller tala lite högre.'];
-  if (db > LIMITS.speech.greenHigh) return ['warn', 'Högt ljud', 'Håll mobilen lite längre bort.'];
-  return ['good', 'Bra ljudnivå', 'Rösten hörs tydligt.'];
+  if (db < LIMITS.speech.yellowLow) return rating('bad', 'speech_bad_label', 'speech_bad_advice');
+  if (db < LIMITS.speech.greenLow) return rating('warn', 'speech_low_label', 'speech_low_advice');
+  if (db > LIMITS.speech.greenHigh) return rating('warn', 'speech_high_label', 'speech_high_advice');
+  return rating('good', 'speech_good_label', 'speech_good_advice');
 }
 
 export function ratePeaks(db, clipped) {
-  if (clipped || db >= LIMITS.peak.red) return ['bad', 'Ljudet klipper', 'Håll mobilen längre bort eller tala lite lägre.'];
-  if (db >= LIMITS.peak.yellow) return ['warn', 'Nära gränsen', 'Tala lite lägre eller håll mobilen längre bort.'];
-  return ['good', 'Inga toppar som klipper', 'Starka ljud hörs utan att förvrängas.'];
+  if (clipped || db >= LIMITS.peak.red) return rating('bad', 'peaks_bad_label', 'peaks_bad_advice');
+  if (db >= LIMITS.peak.yellow) return rating('warn', 'peaks_warn_label', 'peaks_warn_advice');
+  return rating('good', 'peaks_good_label', 'peaks_good_advice');
 }
 
 export function rateNoise(db) {
-  if (db > LIMITS.noise.red) return ['bad', 'Mycket bakgrundsljud', 'Byt rum, eller stäng dörrar, fönster och fläktar.'];
-  if (db > LIMITS.noise.green) return ['warn', 'Lite bakgrundsljud', 'Stäng av musik och fläktar om det går.'];
-  return ['good', 'Tyst bakgrund', 'Inget stör rösten.'];
+  if (db > LIMITS.noise.red) return rating('bad', 'noise_bad_label', 'noise_bad_advice');
+  if (db > LIMITS.noise.green) return rating('warn', 'noise_warn_label', 'noise_warn_advice');
+  return rating('good', 'noise_good_label', 'noise_good_advice');
 }
 
 export function rateLight(light) {
-  if (!light) return ['warn', 'Ljuset kunde inte mätas', 'Kontrollera själv att ansiktet syns tydligt.'];
-  if (light.whiteShare > LIMITS.light.whiteShare) return ['bad', 'Motljus eller för starkt ljus', 'Ställ dig så att ljuset kommer framifrån, inte bakifrån.'];
-  if (light.mean < LIMITS.light.redLow) return ['bad', 'För mörkt', 'Vänd dig mot ett fönster eller tänd en lampa framför dig.'];
-  if (light.mean < LIMITS.light.greenLow) return ['warn', 'Lite mörkt', 'Mer ljus framifrån gör bilden tydligare.'];
-  if (light.mean > LIMITS.light.greenHigh) return ['warn', 'Mycket ljust', 'Flytta dig lite från det starkaste ljuset.'];
-  return ['good', 'Bra ljus', 'Ansiktet syns tydligt.'];
+  if (!light) return rating('warn', 'light_none_label', 'light_none_advice');
+  if (light.whiteShare > LIMITS.light.whiteShare) return rating('bad', 'light_backlit_label', 'light_backlit_advice');
+  if (light.mean < LIMITS.light.redLow) return rating('bad', 'light_dark_label', 'light_dark_advice');
+  if (light.mean < LIMITS.light.greenLow) return rating('warn', 'light_dim_label', 'light_dim_advice');
+  if (light.mean > LIMITS.light.greenHigh) return rating('warn', 'light_bright_label', 'light_bright_advice');
+  return rating('good', 'light_good_label', 'light_good_advice');
 }

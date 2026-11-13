@@ -1,8 +1,11 @@
 // Enhetstester utan webbläsare: teknikkollens gränser och scenfilernas format.
 // Körs med: node tests/unit.mjs
 
+import { readFileSync } from 'node:fs';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from '../public/check.js';
 import { SCENES } from '../public/scenes.js';
+import { sv, t } from '../public/texts.js';
+import { renderIndex, renderManifest, TEMPLATE, INDEX, MANIFEST } from '../tools/render-pages.mjs';
 
 const failures = [];
 const check = (ok, message) => {
@@ -65,6 +68,30 @@ for (const s of SCENES) {
   }
   check(s.ai_stod === true || s.ai_stod === false, `${where}: anger om AI har hjälpt till`);
 }
+
+// ---- Texterna ----
+// Alla texter ligger i texts.js. index.html och manifest.json skapas från dem.
+const template = readFileSync(TEMPLATE, 'utf8');
+check(renderIndex(template) === readFileSync(INDEX, 'utf8'),
+  'index.html är skapad från texts.js (kör annars node tools/render-pages.mjs)');
+check(renderManifest() === readFileSync(MANIFEST, 'utf8'),
+  'manifest.json är skapad från texts.js (kör annars node tools/render-pages.mjs)');
+const code = ['public/app.js', 'public/check.js', 'tools/render-pages.mjs']
+  .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
+const usedKeys = new Set([
+  ...[...code.matchAll(/'([a-z]+(?:_[a-z0-9]+)+)'/g)].map((m) => m[1]),
+  ...[...code.matchAll(/texts\.([a-z]+(?:_[a-z0-9]+)*)/g)].map((m) => m[1]).filter((k) => k !== 'js'), // inte filnamnet texts.js
+  ...[...template.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1])
+]);
+const missingKeys = [...usedKeys].filter((k) => !(k in sv));
+const unusedKeys = Object.keys(sv).filter((k) => !usedKeys.has(k));
+check(missingKeys.length === 0, `Alla texter som används finns i texts.js (${missingKeys.join(', ') || 'inga saknas'})`);
+check(unusedKeys.length === 0, `Alla texter i texts.js används (${unusedKeys.join(', ') || 'inga oanvända'})`);
+check(Object.values(sv).every((v) => typeof v === 'string' && v.trim() === v && v.length > 0), 'Inga tomma texter och inga mellanslag i början eller slutet');
+check(t('role_button', { name: 'Sam' }) === 'Spela Sam', 'Värden fylls i, till exempel Spela Sam');
+let threw = false;
+try { t('finns_inte'); } catch { threw = true; }
+check(threw, 'En felstavad textnyckel ger ett fel i stället för en tom text');
 
 if (failures.length) {
   console.log(`\n${failures.length} test misslyckades.`);

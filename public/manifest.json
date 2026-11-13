@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Övningssidan",
+  "short_name": "Övningssidan",
+  "description": "Öva korta svenska scener och spela in dig själv med mobilens kamera. Videon stannar i mobilen.",
+  "lang": "sv",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#faf9f7",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

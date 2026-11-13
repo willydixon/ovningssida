@@ -122,13 +122,44 @@ try {
   check((await p2.locator('#h-help').innerText()).includes('blockerad'), 'Nekad behörighet visar steg för att tillåta kameran');
   await denied.close();
 
-  // ---- 3. Informationssidorna finns ----
+  // ---- 3. Informationssidorna finns och har ikonen ----
   const info = await browser.newPage();
+  const infoErrors = [];
+  info.on('console', (m) => { if (m.type() === 'error') infoErrors.push(m.text()); });
   for (const f of ['om', 'ai', 'integritet', 'villkor', 'kontakt']) {
     const r = await info.goto(`${BASE}/${f}.html`);
     check(r && r.ok(), `Informationssidan ${f}.html laddas`);
+    check((await info.locator('link[rel="manifest"]').count()) === 1, `${f}.html länkar till app-filen`);
   }
+  check(infoErrors.length === 0, `Inga fel på informationssidorna (${infoErrors.join(' | ') || 'inga'})`);
   await info.close();
+
+  // ---- 4. Ikon och hemskärm ----
+  // Chrome läser app-filen (manifestet) och avgör om sidan kan installeras.
+  const app = await browser.newPage();
+  const appErrors = [];
+  app.on('console', (m) => { if (m.type() === 'error') appErrors.push(m.text()); });
+  await app.goto(`${BASE}/index.html`);
+  const cdp = await app.context().newCDPSession(app);
+  const am = await cdp.send('Page.getAppManifest');
+  check(am.errors.length === 0 && !!am.data, `App-filen läses utan fel (${am.errors.map((e) => e.message).join(' | ') || 'inga fel'})`);
+  const manifest = JSON.parse(am.data || '{}');
+  check(manifest.display === 'standalone' && manifest.start_url === '/' && !!manifest.short_name,
+    'Från hemskärmen öppnas sidan utan adressfält, på startsidan');
+  const pngSize = (buf) => `${buf.readUInt32BE(16)}x${buf.readUInt32BE(20)}`;
+  for (const icon of manifest.icons || []) {
+    const r = await app.request.get(new URL(icon.src, am.url).href);
+    check(r.ok() && pngSize(await r.body()) === icon.sizes, `Ikonen ${icon.src} finns och är ${icon.sizes}`);
+  }
+  check((manifest.icons || []).some((i) => i.purpose === 'maskable'), 'Det finns en ikon som Android kan runda av');
+  const touchHref = await app.locator('link[rel="apple-touch-icon"]').getAttribute('href');
+  const touch = await app.request.get(new URL(touchHref, `${BASE}/`).href);
+  check(touch.ok() && pngSize(await touch.body()) === '180x180', 'iPhone-ikonen finns och är 180x180');
+  const inst = await cdp.send('Page.getInstallabilityErrors');
+  const instErrors = inst.installabilityErrors.map((e) => e.errorId);
+  check(instErrors.length === 0, `Chrome kan installera sidan som app (${instErrors.join(', ') || 'inga hinder'})`);
+  check(appErrors.length === 0, `Inga fel när app-filen läses (${appErrors.join(' | ') || 'inga'})`);
+  await app.close();
 } finally {
   await browser.close();
   server.kill();

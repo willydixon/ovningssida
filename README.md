@@ -6,4 +6,8 @@ Sidan byggs från 9 november 2026 enligt fliken Byggspecifikation i dokumentet "
 
 ## Tester
 
-Kör `tests/run.sh`. Testerna kontrollerar teknikkollens gränser, scenernas format, hela flödet i Chromium med falsk kamera, att inget skickas över nätet och att inga kakor sätts. iPhone och Safari testas för hand, eftersom testmiljön saknar WebKit.
+Kör `tests/run.sh`. Testerna kontrollerar teknikkollens gränser, scenernas format, hela flödet i Chromium med falsk kamera, att inget skickas över nätet, att inga kakor sätts och att sidan kan installeras som app. iPhone och Safari testas för hand, eftersom testmiljön saknar WebKit.
+
+## Ikon och hemskärm
+
+`public/manifest.json` gör att sidan kan läggas på hemskärmen och öppnas utan adressfält. Ikonerna i `public/icons/` ritas av `tools/make-icons.mjs` från en SVG. Kör `NODE_PATH=$(npm root -g) node tools/make-icons.mjs` om ikonen ska ändras.

@@ -161,18 +161,8 @@ try {
   check(appErrors.length === 0, `Inga fel när app-filen läses (${appErrors.join(' | ') || 'inga'})`);
   await app.close();
 
-  // ---- 5. Prissida, anmälan och frågor ----
-  // Räknaren körs här med en lagring i minnet i stället för Netlify Blobs.
-  const { handle: countHit } = await import('../netlify/functions/raknare.mjs');
-  const hits = new Map();
-  const memory = { async set(key, value) { hits.set(key, value); } };
+  // ---- 5. Anmälan och frågor ----
   const p5ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await p5ctx.route(/\/r\?/, async (route) => {
-    const res = await countHit(new Request(route.request().url()), memory);
-    const headers = Object.fromEntries(res.headers.entries());
-    if (headers.location) headers.location = new URL(headers.location, BASE).href;
-    await route.fulfill({ status: res.status, headers, body: Buffer.from(await res.arrayBuffer()) });
-  });
   const p5 = await p5ctx.newPage();
   const p5errors = [];
   const p5requests = [];
@@ -180,13 +170,12 @@ try {
   p5.on('pageerror', (e) => p5errors.push(String(e)));
   p5.on('request', (r) => p5requests.push({ url: r.url(), method: r.method() }));
 
-  await p5.goto(`${BASE}/pris.html`);
-  await p5.waitForLoadState('networkidle');
-  check([...hits.keys()].some((k) => k.includes('/pris_visning/')), 'Prissidan: visningen räknas');
-  await p5.getByRole('link', { name: 'Meddela mig när jag kan köpa' }).click();
-  await p5.waitForURL(/anmalan\.html\?fran=pris/);
-  check([...hits.keys()].some((k) => k.includes('/pris_meddela/')), 'Prissidan: klicket räknas och leder till anmälan');
-  check((await p5.locator('#fran').inputValue()) === 'pris', 'Anmälan: källan från länken fylls i');
+  const missing = await p5.request.get(`${BASE}/pris.html`);
+  check(missing.status() === 404, 'Appen är gratis: sidan om scenpaket finns inte längre');
+  await p5.goto(`${BASE}/index.html`);
+  check((await p5.locator('footer a[href="pris.html"]').count()) === 0, 'Appen är gratis: ingen länk till scenpaket i sidfoten');
+  await p5.goto(`${BASE}/anmalan.html?fran=tiktok-video-1`);
+  check((await p5.locator('#fran').inputValue()) === 'tiktok-video-1', 'Anmälan: källan från länken fylls i');
 
   const form = p5.locator('form[name="anmalan"]');
   const attrs = await form.evaluate((f) => [f.getAttribute('method'), f.getAttribute('action'), f.getAttribute('data-netlify'), f.getAttribute('netlify-honeypot')]);
@@ -208,7 +197,8 @@ try {
   const qform = p5.locator('form[name="fragor"]');
   const qattrs = await qform.evaluate((f) => [f.getAttribute('action'), f.getAttribute('data-netlify')]);
   check(qattrs.join(' ') === '/fragor-tack.html true', 'Frågorna: formuläret går till Netlify Forms');
-  check((await p5.locator('form[name="fragor"] textarea').count()) === 6, 'Frågorna: sex frågor att svara på i text');
+  check((await p5.locator('form[name="fragor"] textarea').count()) === 5, 'Frågorna: fem frågor att svara på i text');
+  check(!(await p5.locator('form[name="fragor"]').innerText()).match(/betala|kr\b|köp/i), 'Frågorna: inga frågor om att betala');
   check(await qform.evaluate((f) => !f.checkValidity()), 'Frågorna: går inte att skicka utan 18 år och samtycke');
 
   for (const f of ['tack', 'fragor-tack']) {

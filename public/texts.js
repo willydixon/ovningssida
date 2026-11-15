@@ -183,32 +183,18 @@ export const sv = {
   footer_privacy: 'Integritet',
   footer_terms: 'Villkor',
   footer_contact: 'Kontakt',
-  footer_price: 'Scenpaket',
   footer_signup: 'Anmäl dig',
 
-  // ---- Fas 2: gemensamt för de nya sidorna ----
+  // ---- Gemensamt för anmälan och frågorna ----
   test_band_pages: 'Testversion. Texterna är utkast.',
   back_to_practice: '← Tillbaka till övningen',
   privacy_link: 'Så hanterar vi dina uppgifter',
   honeypot_label: 'Lämna det här fältet tomt',
 
-  // ---- Fas 2: prissidan (pris.html) ----
-  price_page_title: 'Scenpaket, Övningssidan',
-  price_title: 'Scenpaket',
-  price_lead: 'Ett scenpaket är 10 nya scener på ett tema, med tips till varje scen. Du övar på dem här på sidan, och videon stannar i din mobil.',
-  price_amount: '99 kr per paket',
-  price_includes_title: 'Det här ingår',
-  price_include_1: '10 korta scener för två personer på samma tema',
-  price_include_2: 'Tips om situationen och rollerna i varje scen',
-  price_include_3: 'Granskade av en person som kan teater och film innan de släpps',
-  price_not_yet: 'Det går inte att köpa paketen än. Vill du veta när det går?',
-  price_button: 'Meddela mig när jag kan köpa',
-  price_counter_note: 'Vi räknar hur många som öppnar den här sidan och trycker på knappen, per dag. Vi sparar inte vem du är och använder inga kakor.',
-
-  // ---- Fas 2: anmälan (anmalan.html och tack.html) ----
+  // ---- Anmälan (anmalan.html och tack.html) ----
   signup_page_title: 'Anmälan, Övningssidan',
   signup_title: 'Få ett mejl när något nytt finns',
-  signup_lead: 'Vi mejlar när scenpaketen går att köpa och när det kommer nya scener. Du kan när som helst be oss ta bort din adress.',
+  signup_lead: 'Vi mejlar när det kommer nya scener och när appen går att ladda ned. Du kan när som helst be oss ta bort din adress.',
   signup_email_label: 'Din e-post',
   signup_source_label: 'Var hörde du om oss?',
   signup_source_choose: 'Välj',
@@ -224,8 +210,9 @@ export const sv = {
   thanks_title: 'Tack, du är anmäld',
   thanks_text: 'Vi mejlar när det finns något nytt. Vill du att vi tar bort din adress kan du mejla oss, så gör vi det.',
 
-  // ---- Fas 2: frågor till skådespelare (fragor.html och fragor-tack.html) ----
-  // Frågorna kommer från intervjuguiden i analysdokumentet.
+  // ---- Frågor till skådespelare (fragor.html och fragor-tack.html) ----
+  // Fråga 1 och 2 kommer från intervjuguiden i analysdokumentet. Frågorna om att
+  // betala togs bort när appen blev gratis för skådespelare.
   questions_page_title: 'Frågor till skådespelare, Övningssidan',
   questions_title: 'Frågor till skådespelare och lärare',
   questions_lead: 'Hjälp oss bygga rätt sak. Svara på det du vill. Svaren läses av en människa och används bara för att utveckla övningssidan.',
@@ -235,12 +222,11 @@ export const sv = {
   questions_role_other: 'Annat',
   questions_q1: 'När gjorde du senast en self-tape, och hur gick det till?',
   questions_q2: 'Var hittade du text att öva på?',
-  questions_q3: 'Vad betalade du senast för att bli bättre, och hur mycket?',
-  questions_q4: 'Skulle en inläst motspelare på svenska hjälpa dig?',
-  questions_q5: 'Vad måste ett scenpaket innehålla för att du ska betala 99 kr?',
-  questions_q6: 'Skulle du betala 300 kr för ett kort videosamtal där en kunnig person ser dig spela och ger råd?',
-  questions_q7_label: 'Ja, ni får mejla mig köplänken när den finns',
-  questions_email_label: 'Din e-post, om du vill ha köplänken',
+  questions_q3: 'Vad är svårast när du övar själv?',
+  questions_q4: 'Skulle det hjälpa dig att öva mot en AI som spelar motspelaren och svarar dig?',
+  questions_q5: 'Vilken sorts feedback efter en tagning skulle hjälpa dig mest?',
+  questions_q7_label: 'Ja, ni får mejla mig när det finns något nytt att testa',
+  questions_email_label: 'Din e-post, om du vill ha ett mejl',
   questions_consent_label: 'Ja, ni får spara mina svar i högst 12 månader.',
   questions_button: 'Skicka svaren',
   questions_thanks_page_title: 'Tack för svaren, Övningssidan',

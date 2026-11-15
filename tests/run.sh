@@ -4,7 +4,6 @@ set -e
 cd "$(dirname "$0")/.."
 export NODE_PATH="${NODE_PATH:-$(npm root -g)}"
 node tests/unit.mjs
-node tests/functions.mjs
 node tests/partner.mjs
 node tests/e2e.mjs
 node tests/levels.mjs

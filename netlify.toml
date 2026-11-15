@@ -1,5 +1,5 @@
 # Statisk sida utan byggsteg. Allt som publiceras ligger i public/.
-# Räknaren och statistiken är Netlify-funktioner i netlify/functions/.
+# Serverfunktioner, som AI-motspelarens nyckelhämtning, ligger i netlify/functions/
 [build]
   publish = "public"
 

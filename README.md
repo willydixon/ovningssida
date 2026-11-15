@@ -18,12 +18,12 @@ Under inspelningen kan mobilens inbyggda uppläsningsröst läsa motspelarens re
 - Gränserna är startvärden. De behöver provas på riktiga mobiler, särskilt om rösten hörs svagt på iPhone medan mikrofonen är på.
 - Testerna i `tests/partner.mjs` och avsnitt 6 i `tests/e2e.mjs` använder en falsk röst och en falsk mikrofon som testet styr.
 
-## Fas 2: prissida, anmälan, frågor och räknare
+## Anmälan och frågor
 
-- `pris.html` visar scenpaketen för 99 kr. Knappen Meddela mig räknas och leder till anmälan. Det går inte att köpa än.
-- `anmalan.html` och `fragor.html` skickas till Netlify Forms. Formulären fungerar först när formulärdetektering är påslagen i Netlify. Netlify sparar avsändarens IP-adress med varje inskick, och det står i `integritet.html`.
-- `netlify/functions/raknare.mjs` räknar visningar och klick per dag i Netlify Blobs, utan kakor och utan IP-adress. Adressen är `/r`.
-- `netlify/functions/statistik.mjs` visar antalen på `/statistik?nyckel=…`. Nyckeln sätts som miljövariabeln `STATISTIK_NYCKEL` i Netlify. Utan den är statistiken avstängd.
+Appen är gratis för skådespelare sedan 15 november 2026, enligt Williams beslut. Sidan om scenpaket, räknaren och statistiken är borttagna.
+
+- `anmalan.html` och `fragor.html` skickas till Netlify Forms. Formulärdetekteringen slogs på i Netlify 15 november 2026, och formulären fungerar från första publiceringen efter det. Netlify sparar avsändarens IP-adress med varje inskick, och det står i `integritet.html`.
+- `?fran=` i länken till anmälan sparas med anmälan, till exempel `?fran=tiktok`, så att vi ser var folk kommer ifrån.
 
 ## Ikon och hemskärm
 

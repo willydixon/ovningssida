@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="color-scheme" content="light dark">
 <title>Övningssidan, testversion</title>
 <link rel="stylesheet" href="app.css">
@@ -92,14 +92,24 @@
       <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
       <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / 3:00</div>
     </div>
-    <div id="partner-box">
+    <fieldset id="partner-box" class="partner">
+      <legend>Motspelare</legend>
+      <label class="check" id="mode-ai-row" hidden>
+        <input type="radio" name="partner" value="ai" id="mode-ai" checked>
+        <span>AI som svarar dig (test)</span>
+      </label>
       <label class="check" id="partner-toggle">
-        <input type="checkbox" id="partner-on" checked>
+        <input type="radio" name="partner" value="voice" id="partner-on">
         <span>Mobilen läser motspelarens repliker högt</span>
       </label>
+      <label class="check">
+        <input type="radio" name="partner" value="none" id="mode-none">
+        <span>Ingen röst, jag läser själv</span>
+      </label>
+      <p class="small" id="ai-note" hidden>Du pratar med en AI, inte en människa. AI:n spelar motspelaren och svarar på det du säger, så du kan följa manuset eller improvisera. Medan scenen pågår skickas ljudet från mikrofonen till ElevenLabs. Videon stannar i mobilen.</p>
       <p class="small" id="partner-note">Rösten är mobilens inbyggda uppläsningsröst och kan höras i inspelningen, som en motspelare bakom kameran. Nästa replik kommer när du har sagt din, eller när du trycker på Nästa replik.</p>
       <p class="small" id="partner-no-voice" hidden>Mobilen har ingen svensk uppläsningsröst som sidan kan använda, så motspelarens repliker står bara i texten.</p>
-    </div>
+    </fieldset>
     <div class="controls">
       <div class="row">
         <button type="button" class="primary" data-action="start-rec" id="start-rec">Starta inspelning</button>
@@ -107,7 +117,9 @@
         <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>Stoppa</button>
       </div>
       <p class="prompt" id="partner-done" aria-live="polite" hidden>Scenen är slut. Tryck på Stoppa när du är klar.</p>
+      <p class="prompt" id="ai-status" aria-live="polite" hidden></p>
     </div>
+    <div class="script ai-log" id="ai-log" aria-label="Samtalet med AI-motspelaren" hidden></div>
     <div class="script" id="script" aria-label="Scenens repliker"></div>
     <p class="small">En tagning kan vara högst 3 minuter.</p>
   </section>

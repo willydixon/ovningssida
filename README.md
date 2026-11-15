@@ -18,6 +18,16 @@ Under inspelningen kan mobilens inbyggda uppläsningsröst läsa motspelarens re
 - Gränserna är startvärden. De behöver provas på riktiga mobiler, särskilt om rösten hörs svagt på iPhone medan mikrofonen är på.
 - Testerna i `tests/partner.mjs` och avsnitt 6 i `tests/e2e.mjs` använder en falsk röst och en falsk mikrofon som testet styr.
 
+## AI-motspelaren (test)
+
+William valde 15 november 2026 att testa en AI-motspelare från ElevenLabs, som lyssnar och svarar med naturlig röst.
+
+- `netlify/functions/ai-start.mjs` svarar på `/api/ai-start`. Den hämtar en länk som gäller ett samtal, med nyckeln i den hemliga miljövariabeln `ELEVENLABS_API_KEY` i Netlify. Utan nyckel syns inte valet på sidan.
+- Första gången skapar funktionen AI-motspelaren hos ElevenLabs med namnet `ovningssida-motspelare-v1`: svenska, Gemini 2.5 Flash som språkmodell, rösten Eleven Flash v2.5, högst 240 sekunder per samtal och inget sparat ljud. Ändras inställningarna byts versionen i namnet.
+- `public/ai-partner.js` skickar mikrofonens ljud som 16-bitars PCM med 16 000 prover per sekund och spelar upp AI:ns röst. Scenen, rollen och första repliken skickas när samtalet startar. Medan AI:n pratar skickas tystnad, eftersom inspelningen saknar ekoreducering och AI:n annars skulle höra sig själv. Därför går det inte att avbryta AI:n.
+- Sidans säkerhetspolicy tillåter anrop till den egna sidan och `wss://*.elevenlabs.io`, men inget annat.
+- Innan andra än William får använda den behövs svar i juristfrågan, en genomgång av ElevenLabs villkor och datahantering, en gräns för hur många samtal varje person kan starta, och ett beslut om vem som betalar minuterna.
+
 ## Anmälan och frågor
 
 Appen är gratis för skådespelare sedan 15 november 2026, enligt Williams beslut. Sidan om scenpaket, räknaren och statistiken är borttagna.

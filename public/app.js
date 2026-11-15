@@ -1,11 +1,13 @@
 // Övningssidan, testversion.
 // Allt körs i mobilen. Inspelningen hålls i webbläsarens minne och skickas aldrig
-// någonstans. Sidans säkerhetspolicy (connect-src 'none') stoppar dessutom alla
-// nätverksanrop från skriptet.
+// någonstans. Sidans säkerhetspolicy (connect-src) tillåter bara anrop till den
+// egna sidan och till AI-motspelaren hos ElevenLabs, som bara får ljud och bara
+// när användaren har valt AI som motspelare.
 
 import { SCENES } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
 import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
+import { AiPartner, buildAiSetup } from './ai-partner.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
 const MAX_SECONDS = 180;
@@ -49,7 +51,12 @@ const state = {
   levelTicks: 0,
   listening: null,
   partnerSpeaking: false,
-  utterance: null
+  utterance: null,
+  // AI-motspelaren
+  micSource: null,
+  aiAvailable: null, // null tills funktionen har svarat
+  ai: null,
+  partnerChosen: false // sant när användaren själv har valt motspelare
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -216,6 +223,7 @@ function stopCamera() {
   }
   state.stream = null;
   state.analyser = null;
+  state.micSource = null;
 }
 
 function attachPreview(selector) {
@@ -241,9 +249,11 @@ function connectAnalyser() {
     analyser.smoothingTimeConstant = 0;
     source.connect(analyser); // kopplas inte till högtalaren, så inget eko
     state.analyser = analyser;
+    state.micSource = source; // används också av AI-motspelaren
     state.buf = new Float32Array(analyser.fftSize);
   } catch {
     state.analyser = null;
+    state.micSource = null;
   }
 }
 
@@ -433,6 +443,7 @@ async function toRecord() {
   if (!ok) return;
   attachPreview('#preview-record');
   renderScript();
+  await refreshAiAvailability();
   resetPartner();
   $('#start-rec').hidden = false;
   $('#start-rec').disabled = false;
@@ -445,7 +456,8 @@ async function startRecording() {
   const startButton = $('#start-rec');
   startButton.disabled = true;
   ensureAudioContext();
-  const withPartner = partnerWanted();
+  const mode = partnerMode();
+  const withPartner = mode === 'voice';
   if (withPartner) unlockSpeech(); // måste ske i själva trycket, före allt som väntar
   if (!streamIsLive()) {
     const ok = await startCamera();
@@ -454,6 +466,7 @@ async function startRecording() {
   }
   $('#partner-box').hidden = true;
   if (withPartner) startLevelLoop(); // mäter bakgrundsljudet under nedräkningen
+  if (mode === 'ai') startAi(); // kopplar upp under nedräkningen
   await countdown(3);
 
   const mime = pickMime();
@@ -467,6 +480,7 @@ async function startRecording() {
       recorder = new MediaRecorder(state.stream);
     } catch {
       stopPartner();
+      stopAi();
       showHelp('recorder');
       return;
     }
@@ -488,6 +502,7 @@ async function startRecording() {
   updateRecTime();
   state.recTimer = setInterval(updateRecTime, 250);
   if (withPartner) startPartner();
+  if (state.ai) state.ai.begin();
 }
 
 function updateRecTime() {
@@ -499,6 +514,7 @@ function updateRecTime() {
 function stopRecording(reason) {
   clearInterval(state.recTimer);
   stopPartner();
+  stopAi();
   if (!state.stopReason) state.stopReason = reason || 'user';
   const recorder = state.recorder;
   if (recorder && recorder.state !== 'inactive') {
@@ -577,11 +593,29 @@ function updateVoice() {
   state.voice = findSwedishVoice();
   const found = !!state.voice;
   $('#partner-toggle').hidden = !found;
-  $('#partner-note').hidden = !found;
   $('#partner-no-voice').hidden = found;
+  updateModes();
 }
 
-const partnerWanted = () => !!state.voice && $('#partner-on').checked;
+// Vilken motspelare som är vald: 'ai', 'voice' (mobilens röst) eller 'none'.
+function partnerMode() {
+  const checked = document.querySelector('input[name="partner"]:checked');
+  return checked ? checked.value : 'none';
+}
+
+// Visar bara de val som fungerar här, och texten som hör till det valda. Tills
+// användaren själv har valt gäller ordningen på sidan: AI, mobilens röst, ingen röst.
+function updateModes() {
+  const aiOk = !!state.aiAvailable && !!state.micSource && !!window.AudioWorkletNode;
+  $('#mode-ai-row').hidden = !aiOk;
+  const radios = [...document.querySelectorAll('input[name="partner"]')];
+  const visible = radios.filter((r) => !r.closest('label').hidden);
+  const checked = radios.find((r) => r.checked);
+  if ((!state.partnerChosen || !visible.includes(checked)) && visible[0]) visible[0].checked = true;
+  const mode = partnerMode();
+  $('#ai-note').hidden = mode !== 'ai';
+  $('#partner-note').hidden = mode !== 'voice';
+}
 
 function cancelSpeech() {
   try { if (synth) synth.cancel(); } catch { /* inget att avbryta */ }
@@ -715,9 +749,82 @@ function stopPartner() {
 
 function resetPartner() {
   stopPartner();
+  stopAi();
   updateVoice();
   $('#partner-box').hidden = false;
   $('#partner-done').hidden = true;
+  $('#ai-status').hidden = true;
+  $('#ai-log').hidden = true;
+  $('#ai-log').textContent = '';
+}
+
+// ---------- AI-motspelaren ----------
+// En AI hos ElevenLabs spelar den andra rollen och svarar på det användaren säger.
+// Logiken finns i ai-partner.js och nyckeln i Netlify-funktionen /api/ai-start.
+
+// Frågar funktionen om AI-motspelaren finns, en gång per besök.
+async function refreshAiAvailability() {
+  if (state.aiAvailable !== null) return;
+  try {
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+    const res = await Promise.race([fetch('/api/ai-start?check=1', { cache: 'no-store' }), timeout]);
+    const data = res && res.ok ? await res.json() : null;
+    state.aiAvailable = !!(data && data.available);
+  } catch {
+    state.aiAvailable = false;
+  }
+}
+
+function setAiStatus(status) {
+  const keys = {
+    connecting: 'ai_status_connecting',
+    listening: 'ai_status_listening',
+    speaking: 'ai_status_speaking',
+    error: 'ai_status_error',
+    ended: 'ai_status_ended'
+  };
+  const el = $('#ai-status');
+  if (!keys[status]) return;
+  el.textContent = t(keys[status]);
+  el.dataset.status = status;
+  el.hidden = false;
+}
+
+function addAiLine(who, text, setup) {
+  if (!text) return;
+  const p = document.createElement('p');
+  p.className = who === 'ai' ? 'theirs' : 'mine';
+  const name = document.createElement('span');
+  name.className = 'who';
+  name.textContent = who === 'ai' ? t('ai_them', { name: setup.aiName }) : t('ai_you', { name: setup.myName });
+  p.append(name, document.createTextNode(text));
+  $('#ai-log').append(p);
+  p.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function startAi() {
+  const setup = buildAiSetup(state.scene, state.role);
+  const log = $('#ai-log');
+  log.textContent = '';
+  log.hidden = false;
+  const ai = new AiPartner({
+    ctx: state.audioCtx,
+    source: state.micSource,
+    onLine: (who, text) => addAiLine(who, text, setup),
+    onStatus: setAiStatus
+  });
+  state.ai = ai;
+  ai.connect(setup).catch(() => {
+    if (state.ai !== ai) return;
+    setAiStatus('error');
+    ai.stop();
+    state.ai = null;
+  });
+}
+
+function stopAi() {
+  if (state.ai) state.ai.stop();
+  state.ai = null;
 }
 
 if (synth && typeof synth.addEventListener === 'function') synth.addEventListener('voiceschanged', updateVoice);
@@ -843,9 +950,17 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('pagehide', () => {
+  stopAi();
   stopCamera();
   cancelSpeech();
   if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
+});
+
+// Byte av motspelare visar texten som hör till valet.
+document.addEventListener('change', (event) => {
+  if (event.target.name !== 'partner') return;
+  state.partnerChosen = true;
+  updateModes();
 });
 
 renderScenes();

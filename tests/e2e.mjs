@@ -31,6 +31,7 @@ const browser = await chromium.launch({
 try {
   // ---- 1. Flödet från start till sparad video ----
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await context.route('**/api/ai-start**', (route) => route.fulfill({ json: { available: false } })); // som utan nyckel i Netlify
   const page = await context.newPage();
   const requests = [];
   const consoleErrors = [];
@@ -216,6 +217,7 @@ try {
   const { SCENES } = await import('../public/scenes.js');
   const lines = SCENES[0].repliker;
   const p6ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p6ctx.route('**/api/ai-start**', (route) => route.fulfill({ json: { available: false } }));
   const p6 = await p6ctx.newPage();
   const p6errors = [];
   const p6requests = [];
@@ -363,7 +365,7 @@ try {
   await p6.locator('[data-screen="record"]').waitFor({ state: 'visible' });
   check(await p6.locator('#partner-box').isVisible() && await p6.locator('#partner-done').isHidden() && (await currentLine()) === -1,
     'Ta om: valet syns igen och scenen börjar om');
-  await p6.locator('#partner-on').uncheck();
+  await p6.locator('#mode-none').check();
   await p6.locator('#start-rec').click();
   await p6.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
   await sleep(1500);
@@ -381,7 +383,154 @@ try {
   check(p6errors.length === 0, `Inga fel med motspelaren (${p6errors.join(' | ') || 'inga'})`);
   const p6odd = p6requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
   check(p6odd.length === 0, `Motspelaren skickar inget över nätet (${p6odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  check(await p6.locator('#mode-ai-row').isHidden(), 'Utan nyckel i Netlify syns inget val för AI-motspelaren');
   await p6ctx.close();
+
+  // ---- 7. AI-motspelaren ----
+  // Netlify-funktionen och ElevenLabs byts mot falska. Testet spelar ElevenLabs: tar
+  // emot ljudet, skickar AI:ns röst och text och kontrollerar att mikrofonen tystas
+  // medan AI:n pratar, så att AI:n inte hör sig själv.
+  const p7ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  let aiStartFails = false;
+  await p7ctx.route('**/api/ai-start**', (route) => {
+    if (new URL(route.request().url()).searchParams.has('check')) return route.fulfill({ json: { available: true } });
+    if (aiStartFails) return route.fulfill({ status: 502, json: { available: true, error: 'start_failed' } });
+    return route.fulfill({ json: { available: true, signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_test&token=engang' } });
+  });
+  const p7 = await p7ctx.newPage();
+  const p7errors = [];
+  const p7requests = [];
+  p7.on('console', (m) => { if (m.type() === 'error') p7errors.push(m.text()); });
+  p7.on('pageerror', (e) => p7errors.push(String(e)));
+  p7.on('request', (r) => p7requests.push({ url: r.url(), method: r.method() }));
+  const peakOf = (b64) => {
+    const buf = Buffer.from(b64, 'base64');
+    const pcm = new Int16Array(buf.buffer, buf.byteOffset, buf.length >> 1);
+    let max = 0;
+    for (const v of pcm) max = Math.max(max, Math.abs(v));
+    return max / 32768;
+  };
+  const el = { url: '', init: null, chunks: [], pongs: [], closed: false, socket: null };
+  await p7.routeWebSocket(/elevenlabs\.io/, (ws) => {
+    el.url = ws.url();
+    el.socket = ws;
+    ws.onMessage((message) => {
+      const msg = JSON.parse(String(message));
+      if (msg.type === 'conversation_initiation_client_data') {
+        el.init = msg;
+        ws.send(JSON.stringify({ type: 'conversation_initiation_metadata', conversation_initiation_metadata_event: { conversation_id: 'conv_test', agent_output_audio_format: 'pcm_16000', user_input_audio_format: 'pcm_16000' } }));
+        ws.send(JSON.stringify({ type: 'ping', ping_event: { event_id: 7, ping_ms: 0 } }));
+      } else if (msg.user_audio_chunk) {
+        el.chunks.push({ t: Date.now(), peak: peakOf(msg.user_audio_chunk) });
+      } else if (msg.type === 'pong') {
+        el.pongs.push(msg.event_id);
+      }
+    });
+    ws.onClose(() => { el.closed = true; });
+  });
+  await p7.addInitScript(() => {
+    // Mikrofonen byts mot en ton vars styrka testet styr: tyst rum eller tal.
+    const md = navigator.mediaDevices;
+    const orig = md.getUserMedia.bind(md);
+    md.getUserMedia = async (constraints) => {
+      const stream = await orig(constraints);
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.001;
+      const dest = ctx.createMediaStreamDestination();
+      osc.connect(gain).connect(dest);
+      osc.start();
+      window.__talk = (on) => { gain.gain.value = on ? 0.2 : 0.001; };
+      for (const track of stream.getAudioTracks()) { stream.removeTrack(track); track.stop(); }
+      stream.addTrack(dest.stream.getAudioTracks()[0]);
+      return stream;
+    };
+  });
+  const waitUntil = async (test, ms) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (await test()) return true;
+      await sleep(25);
+    }
+    return false;
+  };
+  const aiTalk = (on) => p7.evaluate((v) => window.__talk(v), on);
+  const aiStatus = () => p7.locator('#ai-status').innerText();
+
+  await p7.goto(`${BASE}/index.html`);
+  await p7.getByRole('button', { name: 'Börja öva' }).click();
+  await p7.locator('#age-ok').check();
+  await p7.locator('#age-continue').click();
+  await p7.locator('.scene').first().click();
+  await p7.locator('#role-buttons button').first().click(); // första rollen, som har första repliken
+  await p7.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p7.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p7.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p7.locator('#mode-ai-row').isVisible() && await p7.locator('#mode-ai').isChecked(), 'AI-motspelaren: valet syns och är förvalt när den finns');
+  check(await p7.locator('#ai-note').isVisible() && /Du pratar med en AI/.test(await p7.locator('#ai-note').innerText()),
+    'AI-motspelaren: det står tydligt att man pratar med en AI');
+
+  await p7.locator('#start-rec').click();
+  await p7.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  await waitUntil(async () => el.init !== null, 4000);
+  check(el.url.includes('token=engang'), 'AI-motspelaren: webbläsaren använder länken från funktionen');
+  const agentOverride = (el.init && el.init.conversation_config_override && el.init.conversation_config_override.agent) || {};
+  check(agentOverride.language === 'sv' && (agentOverride.prompt || {}).prompt.includes(SCENES[0].situation) && !('first_message' in agentOverride),
+    'AI-motspelaren får scenen på svenska och väntar på din första replik');
+  check(await p7.locator('#next-line').isHidden(), 'AI-motspelaren: ingen knapp för Nästa replik behövs');
+
+  await aiTalk(true);
+  await sleep(1200);
+  check(el.chunks.length > 5 && el.chunks.slice(-3).every((c) => c.peak > 0.1), `Ljudet från mikrofonen skickas när du pratar (${el.chunks.length} block)`);
+  check(el.pongs.includes(7), 'AI-motspelaren svarar när ElevenLabs kontrollerar att den är kvar');
+
+  // AI:n svarar med 1 s ljud i fyra delar och texten till repliken.
+  const tone16k = Int16Array.from({ length: 16000 }, (_, i) => Math.round(0.3 * 32767 * Math.sin((2 * Math.PI * 300 * i) / 16000)));
+  for (let i = 0; i < 4; i++) {
+    const part = Buffer.from(tone16k.buffer, i * 8000, 8000).toString('base64');
+    el.socket.send(JSON.stringify({ type: 'audio', audio_event: { audio_base_64: part, event_id: i + 1 } }));
+  }
+  el.socket.send(JSON.stringify({ type: 'agent_response', agent_response_event: { agent_response: 'Jag har inte rört den.' } }));
+  await sleep(400);
+  check((await aiStatus()) === 'AI:n pratar', 'Det syns när AI:n pratar');
+  const during = el.chunks.length;
+  await sleep(400);
+  const whileAiTalks = el.chunks.slice(during);
+  check(whileAiTalks.length > 0 && whileAiTalks.every((c) => c.peak === 0), 'Medan AI:n pratar skickas tystnad, så att AI:n inte hör sig själv');
+  const aiLine = await p7.locator('#ai-log p').last().innerText();
+  check(aiLine.includes('Jag har inte rört den.') && aiLine.includes('(AI)'), 'AI:ns replik visas som text, märkt med AI');
+  await sleep(1200);
+  check(el.chunks.slice(-3).every((c) => c.peak > 0.1), 'När AI:n har pratat klart skickas mikrofonen igen');
+  check((await aiStatus()) === 'AI:n lyssnar', 'Det syns när AI:n lyssnar');
+  el.socket.send(JSON.stringify({ type: 'user_transcript', user_transcription_event: { user_transcript: 'Har du sett nyckeln?' } }));
+  el.socket.send(JSON.stringify({ type: 'interruption', interruption_event: { reason: 'test' } }));
+  await sleep(200);
+  const myLine = await p7.locator('#ai-log p').last().innerText();
+  check(myLine.includes('Har du sett nyckeln?') && /^du, /i.test(myLine), 'Det du sa visas också som text');
+  await aiTalk(false);
+
+  await p7.locator('#stop-rec').click();
+  await p7.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  check(await waitUntil(async () => el.closed, 3000), 'Stoppa avslutar samtalet med AI:n');
+
+  // Om AI-motspelaren inte kan starta fortsätter inspelningen ändå.
+  aiStartFails = true;
+  await p7.getByRole('button', { name: 'Ta om' }).click();
+  await p7.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  await p7.locator('#start-rec').click();
+  await p7.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  await waitUntil(async () => (await p7.locator('#ai-status').getAttribute('data-status')) === 'error', 3000);
+  check((await aiStatus()).includes('kunde inte starta') && await p7.locator('#stop-rec').isVisible(),
+    'Om AI-motspelaren inte startar står det så, och inspelningen fortsätter');
+  await p7.locator('#stop-rec').click();
+  await p7.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+
+  const p7realErrors = p7errors.filter((e) => !/502/.test(e)); // det falska felet i sista testet
+  check(p7realErrors.length === 0, `Inga fel med AI-motspelaren (${p7realErrors.join(' | ') || 'inga'})`);
+  const p7odd = p7requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
+  check(p7odd.length === 0, `Bara ljud går till ElevenLabs, inget annat lämnar sidan (${p7odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  await p7ctx.close();
 } finally {
   await browser.close();
   server.kill();

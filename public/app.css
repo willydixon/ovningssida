@@ -230,6 +230,12 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .script .mine { font-size: 1.15rem; font-weight: 600; }
 .script .theirs { color: var(--quiet); }
 
+/* Val av motspelare */
+.partner { border: 0; margin: 16px 0 0; padding: 0; }
+.partner legend { font-weight: 600; margin-bottom: 4px; padding: 0; }
+.partner .check { margin: 8px 0; }
+.ai-log:empty { display: none; }
+
 /* Motspelaren: knapparna stannar överst när sidan rullar, och repliken som pågår markeras. */
 .controls { background: var(--bg); position: sticky; top: 0; z-index: 2; }
 .controls .row { margin: 0; padding: 12px 0; }

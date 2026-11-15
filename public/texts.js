@@ -122,7 +122,21 @@ export const sv = {
   record_you: 'Du, {name}',
   record_max_note: 'En tagning kan vara högst 3 minuter.',
 
-  // Motspelaren: mobilens egen röst läser den andra rollens repliker.
+  // Motspelaren: välj AI, mobilens röst eller ingen röst.
+  partner_legend: 'Motspelare',
+  partner_mode_ai: 'AI som svarar dig (test)',
+  partner_mode_none: 'Ingen röst, jag läser själv',
+  ai_note: 'Du pratar med en AI, inte en människa. AI:n spelar motspelaren och svarar på det du säger, så du kan följa manuset eller improvisera. Medan scenen pågår skickas ljudet från mikrofonen till ElevenLabs. Videon stannar i mobilen.',
+  ai_status_connecting: 'AI-motspelaren startar …',
+  ai_status_listening: 'AI:n lyssnar',
+  ai_status_speaking: 'AI:n pratar',
+  ai_status_error: 'AI-motspelaren kunde inte starta. Inspelningen fortsätter utan den.',
+  ai_status_ended: 'AI-motspelaren har lagt på. Tryck på Stoppa när du är klar.',
+  ai_log_label: 'Samtalet med AI-motspelaren',
+  ai_them: '{name} (AI)',
+  ai_you: 'Du, {name}',
+
+  // Mobilens egen röst läser den andra rollens repliker.
   partner_toggle: 'Mobilen läser motspelarens repliker högt',
   partner_note: 'Rösten är mobilens inbyggda uppläsningsröst och kan höras i inspelningen, som en motspelare bakom kameran. Nästa replik kommer när du har sagt din, eller när du trycker på Nästa replik.',
   partner_no_voice: 'Mobilen har ingen svensk uppläsningsröst som sidan kan använda, så motspelarens repliker står bara i texten.',

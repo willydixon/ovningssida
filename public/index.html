@@ -44,6 +44,9 @@
       <button type="button" class="tile" data-action="monologue"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-lamp-desk" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" /> <path d="m14.207 4.793-3.414 3.414" /> <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" /> <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" /> </svg><strong>Monolog</strong><span>Din stund i ljuset</span></button>
       <div class="tile soon"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-film" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M7 3v18" /> <path d="M3 7.5h4" /> <path d="M3 12h18" /> <path d="M3 16.5h4" /> <path d="M17 3v18" /> <path d="M17 7.5h4" /> <path d="M17 16.5h4" /> </svg><strong>Mina tagningar</strong><span>Se hur du utvecklas</span><em>Snart</em></div>
     </div>
+    <button type="button" class="plus-banner" data-action="to-plus" id="plus-banner">
+      <svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg><span><strong id="plus-banner-title">Plus</strong> <span id="plus-banner-text">60 AI-minuter i månaden, en mer levande AI-röst och längre tagningar.</span></span>
+    </button>
     <div class="notice" id="inapp-notice" hidden>
       <p><strong>Öppna gärna sidan i Safari eller Chrome.</strong> Du verkar ha öppnat länken inne i en app, och där fungerar kameran inte alltid.</p>
       <p>Tryck på menyn med tre prickar i appen och välj att öppna i webbläsaren, eller kopiera länken.</p>
@@ -146,13 +149,13 @@
     <div class="camera small">
       <video id="preview-record" class="mirror" autoplay muted playsinline></video>
       <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
-      <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / 3:00</div>
+      <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / <span id="rec-max">3:00</span></div>
     </div>
     <fieldset id="partner-box" class="partner">
       <legend>Motspelare</legend>
       <label class="check" id="mode-ai-row" hidden>
         <input type="radio" name="partner" value="ai" id="mode-ai" checked>
-        <span>AI som svarar dig (test)</span>
+        <span>AI som svarar dig (test) <small class="ai-minutes" id="ai-minutes"></small></span>
       </label>
       <label class="check" id="partner-toggle">
         <input type="radio" name="partner" value="voice" id="partner-on">
@@ -166,6 +169,10 @@
       <p class="small" id="partner-no-voice" hidden>Mobilen har ingen svensk uppläsningsröst som sidan kan använda, så motspelarens repliker står bara i texten.</p>
     </fieldset>
     <p class="small" id="ai-note" hidden>Du pratar med en AI, inte en människa. AI:n spelar motspelaren och svarar på det du säger, så du kan följa manuset eller improvisera. Medan scenen pågår skickas ljudet från mikrofonen till ElevenLabs. Videon stannar i mobilen.</p>
+    <div class="notice" id="ai-paywall" hidden>
+      <p id="ai-paywall-text"></p>
+      <button type="button" class="primary" data-action="to-plus">Läs om Plus</button>
+    </div>
     <div class="controls">
       <div class="row">
         <button type="button" class="primary" data-action="start-rec" id="start-rec">Starta inspelning</button>
@@ -177,7 +184,7 @@
     </div>
     <div class="script ai-log" id="ai-log" aria-label="Samtalet med AI-motspelaren" hidden></div>
     <div class="script" id="script" aria-label="Scenens repliker"></div>
-    <p class="small">En tagning kan vara högst 3 minuter.</p>
+    <p class="small" id="record-max-note"></p>
   </section>
 
   <!-- 6. Titta -->
@@ -209,6 +216,62 @@
     </div>
   </section>
 
+  <!-- Plus -->
+  <section data-screen="plus" aria-labelledby="h-plus" hidden>
+    <p class="kicker"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg>Plus</p>
+    <h1 id="h-plus" tabindex="-1">Mer AI och mer tid</h1>
+    <p class="notice" id="plus-message" aria-live="polite" hidden></p>
+    <p class="test-badge" id="plus-test" hidden>Testläge: inga riktiga pengar dras. Betala med testkortet 4242 4242 4242 4242, ett datum framåt i tiden och valfri kod.</p>
+    <div class="compare">
+      <div class="plan">
+        <h2>Gratis</h2>
+        <p class="price">0 kr</p>
+        <ul>
+          <li>Alla övningar och scener</li>
+          <li>Mobilens röst som motspelare och 5 AI-minuter att prova</li>
+          <li>Tagningar upp till 3 minuter</li>
+        </ul>
+      </div>
+      <div class="plan plan-plus">
+        <h2>Plus</h2>
+        <p class="price">99 kr i månaden</p>
+        <ul>
+          <li>60 AI-minuter i månaden</li>
+          <li>En mer levande AI-röst</li>
+          <li>Tagningar upp till 10 minuter</li>
+          <li>Obegränsat i Mina tagningar</li>
+        </ul>
+      </div>
+    </div>
+    <div id="plus-buy">
+      <button type="button" class="primary" data-action="plus-buy" id="plus-buy-btn">Skaffa Plus för 99 kr i månaden</button>
+      <p class="small">Priset är inklusive moms. Ingen bindningstid, och du kan säga upp när du vill. Du har 14 dagars ångerrätt. Betalningen sköts av Stripe. <a href="kopvillkor.html">Köpvillkor</a></p>
+    </div>
+    <div id="plus-have" hidden>
+      <p class="lead" id="plus-minutes"></p>
+      <div class="row">
+        <button type="button" class="secondary" data-action="plus-portal">Ändra kort eller säg upp</button>
+        <button type="button" class="ghost" data-action="to-angra">Ångra köpet</button>
+      </div>
+    </div>
+    <p class="notice" id="plus-unavailable" hidden>Köp är inte igång än. Plus kommer snart.</p>
+  </section>
+
+  <!-- Ångerknappen -->
+  <section data-screen="angra" aria-labelledby="h-angra" hidden>
+    <h1 id="h-angra" tabindex="-1">Ångra köpet</h1>
+    <p>Inom 14 dagar från köpet kan du ångra Plus och få tillbaka hela beloppet. Efter 14 dagar sägs Plus i stället upp till slutet av den månad du har betalat för.</p>
+    <div id="angra-form">
+      <label class="field"><span>Ditt namn</span><input id="angra-name" autocomplete="name" maxlength="100"></label>
+      <p class="small" id="angra-contract"></p>
+      <label class="check"><input type="checkbox" id="angra-ok"><span>Jag vill ångra köpet av Plus.</span></label>
+      <button type="button" class="danger" data-action="angra-send" id="angra-send" disabled>Ångra köpet</button>
+    </div>
+    <p class="notice" id="angra-result" aria-live="polite" hidden></p>
+    <p class="notice" id="angra-none" hidden>Den här mobilen har inget köp av Plus. Har du köpt på en annan mobil, öppna appen där eller hör av dig via Kontakt.</p>
+    <button type="button" class="ghost" data-action="to-start">Till hem</button>
+  </section>
+
   <!-- Hjälp vid fel -->
   <section data-screen="help" aria-labelledby="h-help" hidden>
     <h1 id="h-help" tabindex="-1">Kameran kunde inte starta</h1>
@@ -235,6 +298,7 @@
     <a href="integritet.html">Integritet</a>
     <a href="villkor.html">Villkor</a>
     <a href="kontakt.html">Kontakt</a>
+    <a href="?angra=1">Ångra köp</a>
   </nav>
 </footer>
 </body>

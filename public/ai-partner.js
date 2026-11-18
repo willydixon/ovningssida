@@ -126,8 +126,21 @@ export function buildAiSetup(scene, myRole) {
 export class AiPartner {
   // ctx: sidans AudioContext. source: mikrofonens MediaStreamAudioSourceNode.
   // onLine(who, text): who är 'ai' eller 'me'. onStatus(status): 'connecting',
-  // 'listening', 'speaking', 'error' eller 'ended'.
-  constructor({ ctx, source, onLine = () => {}, onStatus = () => {}, fetchImpl, WebSocketImpl }) {
+  // 'listening', 'speaking', 'error', 'ended', 'minutes_out' eller 'no_minutes'.
+  // authToken: licenskoden för Plus, om användaren har Plus. limitSeconds: hur länge
+  // samtalet högst får pågå enligt mobilens räkning, för gratisminuterna.
+  // onUsage(seconds): hur många sekunder samtalet räknades som när det är slut.
+  constructor({ ctx, source, onLine = () => {}, onStatus = () => {}, onUsage = () => {}, authToken = null, limitSeconds = Infinity, fetchImpl, WebSocketImpl }) {
+    this.onUsage = onUsage;
+    this.authToken = authToken;
+    this.limitSeconds = limitSeconds;
+    this.reservation = null;
+    this.maxSeconds = Infinity;
+    this.liveSince = 0;
+    this.started = false;
+    this.reported = false;
+    this.limitTimer = 0;
+    this.reported = false;
     this.ctx = ctx;
     this.source = source;
     this.onLine = onLine;
@@ -159,10 +172,22 @@ export class AiPartner {
   async connect(setup) {
     this.setStatus('connecting');
     await this.ctx.audioWorklet.addModule('mic-worklet.js');
-    const res = await this.fetchImpl('/api/ai-start', { cache: 'no-store' });
+    const headers = this.authToken ? { authorization: `Bearer ${this.authToken}` } : {};
+    const res = await this.fetchImpl('/api/ai-start', { cache: 'no-store', headers });
     const data = await res.json().catch(() => ({}));
+    if (data.error === 'no_minutes' || data.error === 'free_full') {
+      const err = new Error('Inga AI-minuter kvar');
+      err.code = data.error;
+      throw err;
+    }
     if (!res.ok || !data.signed_url) throw new Error('AI-motspelaren kunde inte starta');
-    if (this.stopped) return;
+    this.reservation = data.reservation || null;
+    this.maxSeconds = Math.min(Number(data.max_seconds) || Infinity, this.limitSeconds);
+    this.started = true; // från och med nu ska samtalet räknas när det slutar
+    if (this.stopped) {
+      this.report();
+      return;
+    }
 
     this.node = new AudioWorkletNode(this.ctx, 'mic-chunks');
     this.node.port.onmessage = (event) => this.onMic(event.data);
@@ -191,6 +216,13 @@ export class AiPartner {
   // Inspelningen har börjat: skicka mikrofonens ljud och spela upp AI:ns röst.
   begin() {
     this.live = true;
+    this.liveSince = Date.now();
+    if (Number.isFinite(this.maxSeconds)) {
+      this.limitTimer = setTimeout(() => {
+        this.setStatus('minutes_out');
+        this.stop();
+      }, this.maxSeconds * 1000);
+    }
     for (const b64 of this.queue.splice(0)) this.play(b64);
     if (this.status === 'connecting' && this.ws && this.ws.readyState === 1) this.setStatus('listening');
   }
@@ -280,9 +312,32 @@ export class AiPartner {
     this.speakingUntil = 0;
   }
 
+  // Säger till funktionen att samtalet är slut, så att bara använd tid räknas.
+  report() {
+    if (this.reported) return;
+    this.reported = true;
+    const clientSeconds = this.liveSince ? Math.ceil((Date.now() - this.liveSince) / 1000) : 0;
+    if (!this.reservation) {
+      this.onUsage(clientSeconds);
+      return;
+    }
+    this.fetchImpl('/api/ai-end', {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reservation: this.reservation, conversation_id: this.conversationId || '' })
+    })
+      .then((res) => res.json())
+      .then((data) => this.onUsage(Number.isFinite(data.used_seconds) ? data.used_seconds : clientSeconds))
+      .catch(() => this.onUsage(clientSeconds));
+  }
+
   stop() {
+    clearTimeout(this.limitTimer);
+    const wasStopped = this.stopped;
     this.stopped = true;
     this.live = false;
+    if (!wasStopped && this.started) this.report();
     this.stopPlayback();
     if (this.ws) {
       try { this.ws.close(); } catch { /* redan stängd */ }

@@ -11,7 +11,12 @@ import { AiPartner, buildAiSetup } from './ai-partner.js';
 import { challengeFor, WARMUP, fiveWaysScene, MONOLOGUES, monologueScene, IMPROVS, improvScene } from './content.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
-const MAX_SECONDS = 180;
+// Längsta tagning och AI-minuter beror på planen. Se också netlify/lib/plus.mjs.
+const PLANS = {
+  gratis: { takeSeconds: 180, aiSeconds: 300 },
+  plus: { takeSeconds: 600, aiSeconds: 3600 }
+};
+const maxTakeSeconds = () => PLANS[state.plan].takeSeconds;
 
 // MP4 i första hand, WebM som reserv. Webbläsaren avgör vad den klarar.
 const MIME_CANDIDATES = [
@@ -53,6 +58,11 @@ const state = {
   listening: null,
   partnerSpeaking: false,
   utterance: null,
+  // Plus
+  plan: 'gratis',
+  license: null,
+  plusUsed: 0, // använda AI-sekunder den här månaden, för Plus
+  plusInfo: null, // svaret från /api/plus/info
   // AI-motspelaren
   micSource: null,
   aiAvailable: null, // null tills funktionen har svarat
@@ -63,7 +73,7 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 
 // Skärmarna där menyn längst ned syns, och vilken flik som då är vald.
-const TABS = { start: 'start', pick: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
+const TABS = { start: 'start', pick: 'start', plus: 'start', angra: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
 
 function show(name) {
   for (const el of document.querySelectorAll('[data-screen]')) {
@@ -143,11 +153,20 @@ function startExercise(scene) {
 }
 
 // Listan att välja ur, för monologer och situationer att improvisera.
-function showPick({ title, text, notice = '', items, onChoose, disabled = false }) {
+function showPick({ title, text, notice = '', items, onChoose, disabled = false, plusLink = false }) {
   $('#h-pick').textContent = title;
   $('#pick-text').textContent = text;
-  $('#pick-notice').textContent = notice;
-  $('#pick-notice').hidden = !notice;
+  const box = $('#pick-notice');
+  box.textContent = notice;
+  if (plusLink) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'primary';
+    b.dataset.action = 'to-plus';
+    b.textContent = t('plus_read_more');
+    box.append(document.createElement('br'), b);
+  }
+  box.hidden = !notice;
   const list = $('#pick-list');
   list.textContent = '';
   for (const item of items) {
@@ -187,12 +206,14 @@ function pickMonologue() {
 async function pickImprov() {
   await refreshAiAvailability();
   const ok = !!state.aiAvailable && !!window.AudioWorkletNode;
+  const left = aiSecondsLeft() >= 15;
   showPick({
     title: t('improv_title'),
     text: t('improv_text'),
-    notice: ok ? '' : t('improv_unavailable'),
+    notice: !ok ? t('improv_unavailable') : (left ? '' : t(state.plan === 'plus' ? 'ai_paywall_plus' : 'ai_paywall_free')),
+    plusLink: ok && !left && state.plan !== 'plus',
     items: IMPROVS,
-    disabled: !ok,
+    disabled: !ok || !left,
     onChoose: (s) => startExercise(improvScene(s, youTexts()))
   });
 }
@@ -296,6 +317,10 @@ async function copyLink() {
 }
 
 // ---------- 18 år ----------
+
+$('#angra-name').addEventListener('input', () => {
+  $('#angra-send').disabled = !$('#angra-ok').checked || !$('#angra-name').value.trim();
+});
 
 $('#age-ok').addEventListener('change', (e) => {
   $('#age-continue').disabled = !e.target.checked;
@@ -684,6 +709,7 @@ async function toRecord() {
   attachPreview('#preview-record');
   renderScript();
   await refreshAiAvailability();
+  renderPlanBits();
   resetPartner();
   $('#start-rec').hidden = false;
   $('#start-rec').disabled = false;
@@ -748,7 +774,7 @@ async function startRecording() {
 function updateRecTime() {
   const s = Math.floor((Date.now() - state.recStart) / 1000);
   $('#rec-time').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  if (s >= MAX_SECONDS) stopRecording('max');
+  if (s >= maxTakeSeconds()) stopRecording('max');
 }
 
 function stopRecording(reason) {
@@ -787,7 +813,7 @@ function onRecordingStopped() {
     max: 'stopped_max'
   };
   const reason = reasons[state.stopReason];
-  note.textContent = reason ? t(reason) : '';
+  note.textContent = reason ? t(reason, { n: maxTakeSeconds() / 60 }) : '';
   note.hidden = !reason;
 
   const playback = $('#playback');
@@ -858,6 +884,8 @@ function updateModes() {
   $('#partner-box').hidden = fixed;
   if (fixed) {
     $('#ai-note').hidden = partnerMode() !== 'ai';
+    if (scene && scene.typ === 'improv') updateAiMinutes();
+    else $('#ai-paywall').hidden = true;
     return;
   }
   const aiOk = !!state.aiAvailable && !!state.micSource && !!window.AudioWorkletNode;
@@ -869,6 +897,26 @@ function updateModes() {
   const mode = partnerMode();
   $('#ai-note').hidden = mode !== 'ai';
   $('#partner-note').hidden = mode !== 'voice';
+  updateAiMinutes();
+}
+
+// Visar hur många AI-minuter som finns kvar, och en väg till Plus när de är slut.
+function updateAiMinutes() {
+  const left = aiSecondsLeft();
+  $('#ai-minutes').textContent = t(state.plan === 'plus' ? 'ai_minutes_plus' : 'ai_minutes_free', { min: minutesText(left) });
+  const out = left < 15;
+  $('#mode-ai').disabled = out;
+  if (out && $('#mode-ai').checked) {
+    const fallback = [...document.querySelectorAll('input[name="partner"]')].find((r) => r.value !== 'ai' && !r.closest('label').hidden);
+    if (fallback) fallback.checked = true;
+  }
+  const improv = !!state.scene && state.scene.typ === 'improv';
+  const wantsAi = partnerMode() === 'ai' || improv;
+  const showWall = out && (improv || !$('#mode-ai-row').hidden);
+  $('#ai-paywall').hidden = !showWall;
+  $('#ai-paywall-text').textContent = t(state.plan === 'plus' ? 'ai_paywall_plus' : 'ai_paywall_free');
+  $('#ai-paywall [data-action="to-plus"]').hidden = state.plan === 'plus';
+  if (out && !wantsAi) $('#ai-note').hidden = true;
 }
 
 function cancelSpeech() {
@@ -1036,7 +1084,10 @@ function setAiStatus(status) {
     listening: 'ai_status_listening',
     speaking: 'ai_status_speaking',
     error: 'ai_status_error',
-    ended: 'ai_status_ended'
+    ended: 'ai_status_ended',
+    minutes_out: 'ai_status_minutes_out',
+    no_minutes: state.plan === 'plus' ? 'ai_paywall_plus' : 'ai_paywall_free',
+    full: 'ai_paywall_full'
   };
   const el = $('#ai-status');
   if (!keys[status]) return;
@@ -1062,16 +1113,24 @@ function startAi() {
   const log = $('#ai-log');
   log.textContent = '';
   log.hidden = false;
+  const plus = state.plan === 'plus';
   const ai = new AiPartner({
     ctx: state.audioCtx,
     source: state.micSource,
+    authToken: plus ? state.license : null,
+    limitSeconds: aiSecondsLeft(),
     onLine: (who, text) => addAiLine(who, text, setup),
-    onStatus: setAiStatus
+    onStatus: setAiStatus,
+    onUsage: (seconds) => {
+      if (plus) state.plusUsed += seconds;
+      else storageSet(STORE.freeUsed, String(freeUsed() + seconds));
+      renderPlanBits();
+    }
   });
   state.ai = ai;
-  ai.connect(setup).catch(() => {
+  ai.connect(setup).catch((err) => {
     if (state.ai !== ai) return;
-    setAiStatus('error');
+    setAiStatus(err && err.code ? (err.code === 'free_full' ? 'full' : 'no_minutes') : 'error');
     ai.stop();
     state.ai = null;
   });
@@ -1167,6 +1226,217 @@ async function retryCamera() {
   }
 }
 
+// ---------- Plus ----------
+// Köpet sker hos Stripe. Efteråt får mobilen en licenskod som visar att man har Plus.
+// Koden och gratisminuterna sparas i mobilens lagring, och inget annat.
+
+const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder' };
+
+function storageGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function storageSet(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch { /* privat läge: gäller bara tills sidan stängs */ }
+}
+
+// Innehållet i licenskoden: prenumerationens nummer, när den köptes och när koden måste kontrolleras igen.
+function licensePayload(token) {
+  try {
+    return token ? JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) : null;
+  } catch {
+    return null;
+  }
+}
+
+const freeUsed = () => Math.max(0, Number(storageGet(STORE.freeUsed)) || 0);
+const freeLeft = () => Math.max(0, PLANS.gratis.aiSeconds - freeUsed());
+const plusLeft = () => Math.max(0, PLANS.plus.aiSeconds - state.plusUsed);
+const aiSecondsLeft = () => (state.plan === 'plus' ? plusLeft() : freeLeft());
+const minutesText = (seconds) => String(Math.floor(seconds / 60));
+
+function setPlan(data) {
+  if (data && data.plan === 'plus' && data.token) {
+    state.plan = 'plus';
+    state.license = data.token;
+    state.plusUsed = Number(data.usedSeconds) || 0;
+    storageSet(STORE.license, data.token);
+  } else {
+    state.plan = 'gratis';
+    state.license = null;
+    state.plusUsed = 0;
+    storageSet(STORE.license, null);
+  }
+  renderPlanBits();
+}
+
+async function api(path, { method = 'GET', body } = {}) {
+  const headers = {};
+  if (state.license) headers.authorization = `Bearer ${state.license}`;
+  if (body) headers['content-type'] = 'application/json';
+  const res = await fetch(path, { method, headers, cache: 'no-store', body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+// Kontrollerar en sparad licenskod när sidan öppnas.
+async function loadPlan() {
+  const token = storageGet(STORE.license);
+  if (!token) {
+    renderPlanBits();
+    return;
+  }
+  state.license = token;
+  state.plan = 'plus'; // tills servern har svarat
+  try {
+    const { ok, status, data } = await api('/api/plus/status');
+    if (ok) setPlan(data);
+    else if (status === 401 || data.plan === 'gratis') setPlan(null);
+  } catch {
+    // Nätet svarar inte: behåll Plus tills vidare.
+  }
+  renderPlanBits();
+}
+
+// Det som visar planen på hemskärmen och vid inspelningen.
+function renderPlanBits() {
+  const plus = state.plan === 'plus';
+  $('#plus-banner-title').textContent = t('plus_banner_title');
+  $('#plus-banner-text').textContent = plus ? t('plus_banner_have', { min: minutesText(plusLeft()) }) : t('plus_banner_text');
+  $('#plus-banner').classList.toggle('have', plus);
+  const max = maxTakeSeconds();
+  $('#rec-max').textContent = `${max / 60}:00`;
+  $('#record-max-note').textContent = t('record_max_note', { n: max / 60 });
+}
+
+async function showPlus(message = '') {
+  const msg = $('#plus-message');
+  msg.textContent = message;
+  msg.hidden = !message;
+  const plus = state.plan === 'plus';
+  $('#plus-have').hidden = !plus;
+  $('#plus-buy').hidden = plus;
+  $('#plus-minutes').textContent = t('plus_minutes', { left: minutesText(plusLeft()), limit: PLANS.plus.aiSeconds / 60 });
+  show('plus');
+  if (!state.plusInfo) {
+    try {
+      const { data } = await api('/api/plus/info');
+      state.plusInfo = data;
+    } catch {
+      state.plusInfo = { available: false };
+    }
+  }
+  const available = !!state.plusInfo.available;
+  $('#plus-test').hidden = !(available && state.plusInfo.test);
+  $('#plus-unavailable').hidden = available || plus;
+  $('#plus-buy-btn').disabled = !available;
+}
+
+async function buyPlus() {
+  const button = $('#plus-buy-btn');
+  button.disabled = true;
+  try {
+    const { ok, data } = await api('/api/plus/checkout', { method: 'POST' });
+    if (ok && data.url) {
+      location.href = data.url; // Stripes betalsida
+      return;
+    }
+  } catch { /* visas nedan */ }
+  button.disabled = false;
+  showPlus(t('plus_failed'));
+}
+
+async function openPortal() {
+  try {
+    const { ok, data } = await api('/api/plus/portal', { method: 'POST' });
+    if (ok && data.url) {
+      location.href = data.url; // Stripes sida för kort och uppsägning
+      return;
+    }
+  } catch { /* visas nedan */ }
+  showPlus(t('plus_failed'));
+}
+
+// Efter Stripe kommer man tillbaka hit med ?plus=klar, ?plus=avbrutet eller ?plus=hantera.
+async function handleReturn() {
+  const params = new URLSearchParams(location.search);
+  const plus = params.get('plus');
+  const withdraw = params.has('angra');
+  if (!plus && !withdraw) return false;
+  history.replaceState(null, '', location.pathname);
+  if (withdraw) {
+    await loadPlan(); // licenskoden behövs för att ångra
+    showWithdraw();
+    return true;
+  }
+  if (plus === 'klar') {
+    try {
+      const id = encodeURIComponent(params.get('session_id') || '');
+      const { ok, data } = await api(`/api/plus/activate?session_id=${id}`);
+      if (ok) {
+        setPlan(data);
+        await showPlus(t('plus_welcome'));
+        return true;
+      }
+    } catch { /* visas nedan */ }
+    await showPlus(t('plus_failed'));
+    return true;
+  }
+  if (plus === 'avbrutet') {
+    await showPlus(t('plus_canceled'));
+    return true;
+  }
+  await loadPlan();
+  await showPlus();
+  return true;
+}
+
+// ---------- Ångerknappen ----------
+
+function showWithdraw() {
+  const payload = licensePayload(state.license || storageGet(STORE.license));
+  $('#angra-form').hidden = !payload;
+  $('#angra-none').hidden = !!payload;
+  $('#angra-result').hidden = true;
+  $('#angra-ok').checked = false;
+  $('#angra-send').disabled = true;
+  if (payload) {
+    const date = new Date(payload.start * 1000).toLocaleDateString('sv-SE');
+    $('#angra-contract').textContent = t('angra_contract', { id: payload.sub, date });
+  }
+  show('angra');
+}
+
+async function sendWithdraw() {
+  const name = $('#angra-name').value.trim();
+  if (!name || !$('#angra-ok').checked) return;
+  $('#angra-send').disabled = true;
+  const result = $('#angra-result');
+  try {
+    const { ok, data } = await api('/api/plus/angra', { method: 'POST', body: { namn: name, bekraftat: true } });
+    if (ok) {
+      const time = new Date(data.received).toLocaleString('sv-SE');
+      if (data.status === 'angrat') {
+        result.textContent = t('angra_done', { time });
+        setPlan(null);
+      } else if (data.status === 'redan_avslutad') {
+        result.textContent = t('angra_already');
+        setPlan(null);
+      } else {
+        result.textContent = t('angra_cancelled', { time, date: new Date(data.ends * 1000).toLocaleDateString('sv-SE') });
+      }
+      result.hidden = false;
+      $('#angra-form').hidden = true;
+      return;
+    }
+  } catch { /* visas nedan */ }
+  result.textContent = t('angra_failed');
+  result.hidden = false;
+  $('#angra-send').disabled = false;
+}
+
 // ---------- Händelser ----------
 
 document.addEventListener('click', (event) => {
@@ -1190,6 +1460,11 @@ document.addEventListener('click', (event) => {
     case 'fiveways': requireAdult(() => startExercise(fiveWaysScene(youTexts()))); break;
     case 'monologue': requireAdult(pickMonologue); break;
     case 'improv': requireAdult(pickImprov); break;
+    case 'to-plus': stopCamera(); clearTake(); showPlus(); break;
+    case 'plus-buy': buyPlus(); break;
+    case 'plus-portal': openPortal(); break;
+    case 'to-angra': showWithdraw(); break;
+    case 'angra-send': sendWithdraw(); break;
     case 'warmup-start': runWarmupTimer(); break;
     case 'warmup-next': nextWarmup(); break;
     case 'next-twister': {
@@ -1216,6 +1491,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.recorder && state.recorder.state === 'recording') {
     stopRecording('hidden');
   }
+  // Licenskoden kontrolleras igen minst en gång per dygn, även om sidan är öppen länge.
+  if (!document.hidden && state.plan === 'plus') {
+    const payload = licensePayload(state.license);
+    if (payload && payload.exp <= Date.now() / 1000) loadPlan();
+  }
 });
 
 window.addEventListener('pagehide', () => {
@@ -1227,6 +1507,10 @@ window.addEventListener('pagehide', () => {
 
 // Byte av motspelare visar texten som hör till valet.
 document.addEventListener('change', (event) => {
+  if (event.target.id === 'angra-ok') {
+    $('#angra-send').disabled = !event.target.checked || !$('#angra-name').value.trim();
+    return;
+  }
   if (event.target.name !== 'partner') return;
   state.partnerChosen = true;
   updateModes();
@@ -1235,4 +1519,6 @@ document.addEventListener('change', (event) => {
 renderScenes();
 renderHome();
 updateVoice();
+renderPlanBits();
 show('start');
+handleReturn().then((handled) => { if (!handled) loadPlan(); });

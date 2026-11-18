@@ -105,7 +105,9 @@ const usedKeys = new Set([
   ...[...code.matchAll(/texts\.([a-z]+(?:_[a-z0-9]+)*)/g)].map((m) => m[1]).filter((k) => k !== 'js'), // inte filnamnet texts.js
   ...templates.flatMap(([, template]) => [...template.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))
 ]);
-const missingKeys = [...usedKeys].filter((k) => !(k in sv));
+// Koder från servern och adressparametrar som ser ut som textnycklar men inte är det.
+const NOT_TEXTS = new Set(['free_full', 'no_minutes', 'session_id', 'redan_avslutad']);
+const missingKeys = [...usedKeys].filter((k) => !(k in sv) && !NOT_TEXTS.has(k));
 const unusedKeys = Object.keys(sv).filter((k) => !usedKeys.has(k));
 check(missingKeys.length === 0, `Alla texter som används finns i texts.js (${missingKeys.join(', ') || 'inga saknas'})`);
 check(unusedKeys.length === 0, `Alla texter i texts.js används (${unusedKeys.join(', ') || 'inga oanvända'})`);

@@ -28,21 +28,35 @@ William valde 18 november 2026 utseendet Premiär bland tre förslag (`design/fo
 - Uppvärmningen har fyra steg utan kamera: andning med en cirkel i takt, läppar och tunga, tungvrickare och rösten i rummet.
 - Scenerna har egna SVG-bilder i `public/img/`, som `tools/render-pages.mjs` ritar från `tools/scene-art.mjs`, och en genre.
 - Ikonerna kommer från Lucide (ISC-licens) och ligger i `tools/icons/`. I mallarna skrivs de som `{{icon:namn}}`.
-- Improvisera med AI, En replik fem sätt, Monolog och Mina tagningar är märkta Snart och byggs härnäst, liksom Din spelstil och fler språk (svenska och engelska först, sedan spanska, tyska och franska).
+- Improvisera med AI, En replik fem sätt och Monolog finns. Mina tagningar, Din spelstil och fler språk (svenska och engelska först, sedan spanska, tyska och franska) byggs härnäst.
 
 ## AI-motspelaren (test)
 
 William valde 15 november 2026 att testa en AI-motspelare från ElevenLabs, som lyssnar och svarar med naturlig röst.
 
 - `netlify/functions/ai-start.mjs` svarar på `/api/ai-start`. Den hämtar en länk som gäller ett samtal, med nyckeln i den hemliga miljövariabeln `ELEVENLABS_API_KEY` i Netlify. Utan nyckel syns inte valet på sidan.
-- Första gången skapar funktionen AI-motspelaren hos ElevenLabs med namnet `ovningssida-motspelare-v1`: svenska, Gemini 2.5 Flash som språkmodell, rösten Eleven Flash v2.5, högst 240 sekunder per samtal och inget sparat ljud. Ändras inställningarna byts versionen i namnet.
+- Första gången skapar funktionen två AI-motspelare hos ElevenLabs: `ovningssida-motspelare-v1` för gratis (rösten Eleven Flash v2.5, högst 240 sekunder per samtal) och `ovningssida-motspelare-plus-v1` för Plus (rösten Eleven v4 Turbo, högst 600 sekunder). Båda pratar svenska, använder Gemini 2.5 Flash som språkmodell och sparar inget ljud. Ändras inställningarna byts versionen i namnet.
 - `public/ai-partner.js` skickar mikrofonens ljud som 16-bitars PCM med 16 000 prover per sekund och spelar upp AI:ns röst. Scenen, rollen och första repliken skickas när samtalet startar. Medan AI:n pratar skickas tystnad, eftersom inspelningen saknar ekoreducering och AI:n annars skulle höra sig själv. Därför går det inte att avbryta AI:n.
 - Sidans säkerhetspolicy tillåter anrop till den egna sidan och `wss://*.elevenlabs.io`, men inget annat.
-- Innan andra än William får använda den behövs svar i juristfrågan, en genomgång av ElevenLabs villkor och datahantering, en gräns för hur många samtal varje person kan starta, och ett beslut om vem som betalar minuterna.
+- Innan andra än William får använda den behövs svar i juristfrågan och en genomgång av ElevenLabs villkor och datahantering.
+
+## Plus (testläge med Stripe)
+
+William valde 18 november 2026 Plus för 99 kr i månaden, med köp i testläge hos Stripe först.
+
+- Gratis: alla övningar, mobilens röst som motspelare, 5 AI-minuter att prova och tagningar upp till 3 minuter. Plus: 60 AI-minuter i månaden, den mer levande AI-rösten, samtal och tagningar upp till 10 minuter och obegränsat i Mina tagningar.
+- `netlify/functions/plus.mjs` svarar på `/api/plus/*`: `info`, `checkout` (Stripes betalsida), `activate` (efter betalningen), `status`, `portal` (Stripes kundsida för kort och uppsägning) och `angra` (ångerknappen). Gemensam kod finns i `netlify/lib/plus.mjs`.
+- Priset och inställningarna för Stripes kundsida skapas av funktionen första gången och hittas sedan igen, så inget behöver ställas in för hand hos Stripe.
+- Efter köpet får mobilen en licenskod, underskriven med `LICENSE_SECRET`. Den innehåller prenumerationens och kundens nummer hos Stripe, aldrig e-post, och kontrolleras mot Stripe minst en gång per dygn.
+- AI-minuterna räknas i Netlify Blobs (`ai-minuter`): per prenumeration och kalendermånad för Plus, och för alla gratisanvändare tillsammans per dygn (`FREE_AI_SECONDS_PER_DAY`, 1 800 sekunder om inget annat anges). När ett samtal startar reserveras tid. `netlify/functions/ai-end.mjs` frågar sedan ElevenLabs hur långt samtalet blev och lämnar tillbaka resten. De 5 gratisminuterna per person räknas i mobilen.
+- Ångerknappen finns längst ned på varje sida (`?angra=1`) och på Plus-sidan. Inom 14 dagar avslutas Plus direkt och hela beloppet betalas tillbaka. Efter 14 dagar sägs Plus upp till periodens slut. Namnet och tiden sparas hos Stripe.
+- Hemliga miljövariabler i Netlify: `STRIPE_SECRET_KEY` (börjar med `sk_test_` i testläge) och `LICENSE_SECRET`. Utan dem går det inte att köpa, och Plus-sidan säger det.
+- Innan något säljs på riktigt: säljarens namn, organisationsnummer, adress, e-post och telefon i `kopvillkor.html`, F-skatt och moms, en jurist som läser köpvillkoren, och en bekräftelse av ångern på e-post (ett varaktigt medium). I appar från App Store och Google Play måste köp i stället göras med deras egna betalsystem.
+- Testerna i `tests/plus.mjs` använder en låtsas-Stripe, och avsnitt 10 i `tests/e2e.mjs` går igenom köpet, minuterna, kundsidan och ångern i webbläsaren.
 
 ## Anmälan och frågor
 
-Appen är gratis för skådespelare sedan 15 november 2026, enligt Williams beslut. Sidan om scenpaket, räknaren och statistiken är borttagna.
+Appen var helt gratis från 15 november 2026, enligt Williams beslut, och fick Plus som tillval 18 november 2026. Det som är gratis finns kvar för alla.
 
 - `anmalan.html` och `fragor.html` skickas till Netlify Forms. Formulärdetekteringen slogs på i Netlify 15 november 2026, och formulären fungerar från första publiceringen efter det. Netlify sparar avsändarens IP-adress med varje inskick, och det står i `integritet.html`.
 - `?fran=` i länken till anmälan sparas med anmälan, till exempel `?fran=tiktok`, så att vi ser var folk kommer ifrån.

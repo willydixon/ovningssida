@@ -44,6 +44,9 @@
       <button type="button" class="tile" data-action="monologue">{{icon:lamp-desk}}<strong>{{tile_monologue}}</strong><span>{{tile_monologue_text}}</span></button>
       <div class="tile soon">{{icon:film}}<strong>{{tile_takes}}</strong><span>{{tile_takes_text}}</span><em>{{soon}}</em></div>
     </div>
+    <button type="button" class="plus-banner" data-action="to-plus" id="plus-banner">
+      {{icon:sparkles}}<span><strong id="plus-banner-title">{{plus_banner_title}}</strong> <span id="plus-banner-text">{{plus_banner_text}}</span></span>
+    </button>
     <div class="notice" id="inapp-notice" hidden>
       <p><strong>{{inapp_title}}</strong> {{inapp_text}}</p>
       <p>{{inapp_how}}</p>
@@ -146,13 +149,13 @@
     <div class="camera small">
       <video id="preview-record" class="mirror" autoplay muted playsinline></video>
       <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
-      <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / 3:00</div>
+      <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / <span id="rec-max">3:00</span></div>
     </div>
     <fieldset id="partner-box" class="partner">
       <legend>{{partner_legend}}</legend>
       <label class="check" id="mode-ai-row" hidden>
         <input type="radio" name="partner" value="ai" id="mode-ai" checked>
-        <span>{{partner_mode_ai}}</span>
+        <span>{{partner_mode_ai}} <small class="ai-minutes" id="ai-minutes"></small></span>
       </label>
       <label class="check" id="partner-toggle">
         <input type="radio" name="partner" value="voice" id="partner-on">
@@ -166,6 +169,10 @@
       <p class="small" id="partner-no-voice" hidden>{{partner_no_voice}}</p>
     </fieldset>
     <p class="small" id="ai-note" hidden>{{ai_note}}</p>
+    <div class="notice" id="ai-paywall" hidden>
+      <p id="ai-paywall-text"></p>
+      <button type="button" class="primary" data-action="to-plus">{{plus_read_more}}</button>
+    </div>
     <div class="controls">
       <div class="row">
         <button type="button" class="primary" data-action="start-rec" id="start-rec">{{record_button_start}}</button>
@@ -177,7 +184,7 @@
     </div>
     <div class="script ai-log" id="ai-log" aria-label="{{ai_log_label}}" hidden></div>
     <div class="script" id="script" aria-label="{{record_script_label}}"></div>
-    <p class="small">{{record_max_note}}</p>
+    <p class="small" id="record-max-note"></p>
   </section>
 
   <!-- 6. Titta -->
@@ -209,6 +216,62 @@
     </div>
   </section>
 
+  <!-- Plus -->
+  <section data-screen="plus" aria-labelledby="h-plus" hidden>
+    <p class="kicker">{{icon:sparkles}}{{plus_kicker}}</p>
+    <h1 id="h-plus" tabindex="-1">{{plus_title}}</h1>
+    <p class="notice" id="plus-message" aria-live="polite" hidden></p>
+    <p class="test-badge" id="plus-test" hidden>{{plus_test}}</p>
+    <div class="compare">
+      <div class="plan">
+        <h2>{{plus_free_title}}</h2>
+        <p class="price">{{plus_free_price}}</p>
+        <ul>
+          <li>{{plus_free_1}}</li>
+          <li>{{plus_free_2}}</li>
+          <li>{{plus_free_3}}</li>
+        </ul>
+      </div>
+      <div class="plan plan-plus">
+        <h2>{{plus_plus_title}}</h2>
+        <p class="price">{{plus_price}}</p>
+        <ul>
+          <li>{{plus_plus_1}}</li>
+          <li>{{plus_plus_2}}</li>
+          <li>{{plus_plus_3}}</li>
+          <li>{{plus_plus_4}}</li>
+        </ul>
+      </div>
+    </div>
+    <div id="plus-buy">
+      <button type="button" class="primary" data-action="plus-buy" id="plus-buy-btn">{{plus_buy}}</button>
+      <p class="small">{{plus_buy_note}} <a href="kopvillkor.html">{{plus_terms_link}}</a></p>
+    </div>
+    <div id="plus-have" hidden>
+      <p class="lead" id="plus-minutes"></p>
+      <div class="row">
+        <button type="button" class="secondary" data-action="plus-portal">{{plus_manage}}</button>
+        <button type="button" class="ghost" data-action="to-angra">{{plus_withdraw}}</button>
+      </div>
+    </div>
+    <p class="notice" id="plus-unavailable" hidden>{{plus_unavailable}}</p>
+  </section>
+
+  <!-- Ångerknappen -->
+  <section data-screen="angra" aria-labelledby="h-angra" hidden>
+    <h1 id="h-angra" tabindex="-1">{{angra_title}}</h1>
+    <p>{{angra_text}}</p>
+    <div id="angra-form">
+      <label class="field"><span>{{angra_name}}</span><input id="angra-name" autocomplete="name" maxlength="100"></label>
+      <p class="small" id="angra-contract"></p>
+      <label class="check"><input type="checkbox" id="angra-ok"><span>{{angra_confirm}}</span></label>
+      <button type="button" class="danger" data-action="angra-send" id="angra-send" disabled>{{angra_button}}</button>
+    </div>
+    <p class="notice" id="angra-result" aria-live="polite" hidden></p>
+    <p class="notice" id="angra-none" hidden>{{angra_none}}</p>
+    <button type="button" class="ghost" data-action="to-start">{{pick_back}}</button>
+  </section>
+
   <!-- Hjälp vid fel -->
   <section data-screen="help" aria-labelledby="h-help" hidden>
     <h1 id="h-help" tabindex="-1">{{help_default_title}}</h1>
@@ -235,6 +298,7 @@
     <a href="integritet.html">{{footer_privacy}}</a>
     <a href="villkor.html">{{footer_terms}}</a>
     <a href="kontakt.html">{{footer_contact}}</a>
+    <a href="?angra=1">{{footer_withdraw}}</a>
   </nav>
 </footer>
 </body>

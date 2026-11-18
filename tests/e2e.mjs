@@ -695,6 +695,204 @@ try {
   await p9.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
   check(p9errors.length === 0, `Inga fel i övningarna (${p9errors.join(' | ') || 'inga'})`);
   await p9ctx.close();
+
+  // ---- 10. Plus: köp, AI-minuter, längre tagningar, kundsidan och ångerknappen ----
+  // Stripe och Netlify-funktionerna byts mot falska. Köpet hoppar direkt tillbaka från
+  // "Stripe" till sidan, som Stripe gör efter en betalning.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const plusPayload = { plan: 'plus', sub: 'sub_test1', cus: 'cus_test1', start: nowSec - 86400, exp: nowSec + 3600 };
+  const plusToken = `v1.${Buffer.from(JSON.stringify(plusPayload)).toString('base64url')}.underskrift`;
+  const api = { calls: [], info: { available: true, test: true, price: 99 }, used: 0 };
+  const p10ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p10ctx.route('**/api/**', async (route) => {
+    const r = route.request();
+    const u = new URL(r.url());
+    const call = { path: u.pathname, method: r.method(), query: u.search, auth: r.headers().authorization || '', body: r.postData() || '' };
+    api.calls.push(call);
+    switch (u.pathname) {
+      case '/api/ai-start':
+        if (u.searchParams.has('check')) return route.fulfill({ json: { available: true } });
+        return route.fulfill({ json: { available: true, plan: call.auth ? 'plus' : 'gratis', signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=p&token=plus', max_seconds: call.auth ? 600 : 240, reservation: '11111111-2222-3333-4444-555555555555' } });
+      case '/api/ai-end':
+        return route.fulfill({ json: { used_seconds: 120, plan: 'plus' } });
+      case '/api/plus/info':
+        return route.fulfill({ json: api.info });
+      case '/api/plus/checkout':
+        return route.fulfill({ json: { url: `${BASE}/index.html?plus=klar&session_id=cs_test_abc123` } });
+      case '/api/plus/activate':
+        return route.fulfill({ json: { plan: 'plus', token: plusToken, usedSeconds: 0, limitSeconds: 3600 } });
+      case '/api/plus/status':
+        return route.fulfill({ json: { plan: 'plus', token: plusToken, usedSeconds: api.used, limitSeconds: 3600 } });
+      case '/api/plus/portal':
+        return route.fulfill({ json: { url: `${BASE}/index.html?plus=hantera` } });
+      case '/api/plus/angra':
+        return route.fulfill({ json: { status: 'angrat', received: new Date().toISOString(), refunded: 99 } });
+      default:
+        return route.fulfill({ status: 404, json: { error: 'not_found' } });
+    }
+  });
+  const p10 = await p10ctx.newPage();
+  const p10errors = [];
+  const p10requests = [];
+  p10.on('console', (m) => { if (m.type() === 'error') p10errors.push(m.text()); });
+  p10.on('pageerror', (e) => p10errors.push(String(e)));
+  p10.on('request', (r) => p10requests.push({ url: r.url(), method: r.method() }));
+  let plusInit = null;
+  let plusSocket = null;
+  await p10.routeWebSocket(/elevenlabs\.io/, (ws) => {
+    plusSocket = ws;
+    ws.onMessage((message) => {
+      const msg = JSON.parse(String(message));
+      if (msg.type === 'conversation_initiation_client_data') {
+        plusInit = msg;
+        ws.send(JSON.stringify({ type: 'conversation_initiation_metadata', conversation_initiation_metadata_event: { conversation_id: 'conv_plus1', agent_output_audio_format: 'pcm_16000', user_input_audio_format: 'pcm_16000' } }));
+      }
+    });
+  });
+  const callsTo = (path) => api.calls.filter((c) => c.path === path);
+  const storage = (key) => p10.evaluate((k) => localStorage.getItem(k), key);
+
+  await p10.goto(`${BASE}/index.html`);
+  check((await p10.locator('#plus-banner').innerText()).includes('60 AI-minuter i månaden'), 'Plus: hemskärmen visar vad Plus ger');
+  await p10.locator('#plus-banner').click();
+  await p10.locator('[data-screen="plus"]').waitFor({ state: 'visible' });
+  await p10.locator('#plus-test').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  check((await p10.locator('.plan').count()) === 2 && (await p10.locator('.plan-plus .price').innerText()) === '99 kr i månaden', 'Plus: gratis och Plus jämförs, Plus kostar 99 kr i månaden');
+  check(await p10.locator('#plus-test').isVisible() && (await p10.locator('#plus-test').innerText()).includes('4242'), 'Plus: i testläge står det att inga riktiga pengar dras, och vilket testkort som gäller');
+  check(await p10.locator('#plus-buy-btn').isEnabled() && (await p10.locator('#plus-buy a').getAttribute('href')) === 'kopvillkor.html', 'Plus: köpknappen fungerar och köpvillkoren finns bredvid');
+  check(/14 dagars ångerrätt/.test(await p10.locator('#plus-buy').innerText()) && /inklusive moms/.test(await p10.locator('#plus-buy').innerText()), 'Plus: ångerrätt och moms står före köpet');
+  check(await p10.evaluate(() => getComputedStyle(document.querySelector('.plan-plus')).borderTopColor !== getComputedStyle(document.querySelector('.plan:not(.plan-plus)')).borderTopColor), 'Plus: Plus-kortet är framhävt');
+
+  await Promise.all([p10.waitForURL(/plus=klar/), p10.locator('#plus-buy-btn').click()]);
+  await p10.locator('#plus-message').waitFor({ state: 'visible', timeout: 5000 });
+  check(callsTo('/api/plus/checkout')[0]?.method === 'POST', 'Plus: köpet startas hos Stripe');
+  check(callsTo('/api/plus/activate')[0]?.query === '?session_id=cs_test_abc123', 'Plus: efter betalningen kontrolleras köpet med köpnumret');
+  check((await p10.locator('#plus-message').innerText()).startsWith('Välkommen till Plus') && await p10.locator('#plus-have').isVisible() && await p10.locator('#plus-buy').isHidden(),
+    'Plus: efter köpet välkomnas man och köpknappen byts mot hantering');
+  check((await p10.locator('#plus-minutes').innerText()) === 'Du har 60 av 60 AI-minuter kvar den här månaden.', 'Plus: 60 AI-minuter finns');
+  check((await storage('plus-licens')) === plusToken && !p10.url().includes('session_id'), 'Plus: licenskoden sparas i mobilen och köpnumret tas bort ur adressen');
+
+  // Plus ger längre tagningar och den bättre AI-motspelaren.
+  check(await p10.locator('#tabbar').isVisible(), 'Plus: menyn längst ned finns kvar på Plus-sidan');
+  await p10.locator('#tabbar [data-tab="start"]').click();
+  check((await p10.locator('#plus-banner-text').innerText()) === 'Du har Plus. 60 AI-minuter kvar den här månaden.', 'Plus: hemskärmen visar minuterna som är kvar');
+  await p10.locator('.tile[data-action="play-scenes"]').click();
+  await p10.locator('#age-ok').check();
+  await p10.locator('#age-continue').click();
+  await p10.locator('.scene').first().click();
+  await p10.locator('#role-buttons button').first().click();
+  await p10.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p10.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p10.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check((await p10.locator('#rec-max').innerText()) === '10:00' && (await p10.locator('#record-max-note').innerText()).includes('10 minuter'), 'Plus: en tagning kan vara upp till 10 minuter');
+  check((await p10.locator('#ai-minutes').innerText()) === 'Plus: 60 minuter kvar' && await p10.locator('#mode-ai').isChecked(), 'Plus: AI-motspelaren är förvald och visar Plus-minuterna');
+  await p10.locator('#start-rec').click();
+  await p10.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  for (let i = 0; i < 80 && !plusInit; i++) await sleep(50);
+  const aiStartCall = callsTo('/api/ai-start').find((c) => !c.query.includes('check'));
+  check(aiStartCall && aiStartCall.auth === `Bearer ${plusToken}`, 'Plus: AI-motspelaren startas med licenskoden');
+  await sleep(500);
+  await p10.locator('#stop-rec').click();
+  await p10.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  for (let i = 0; i < 40 && !callsTo('/api/ai-end').length; i++) await sleep(50);
+  const endCall = callsTo('/api/ai-end')[0];
+  check(endCall && endCall.method === 'POST' && JSON.parse(endCall.body).reservation === '11111111-2222-3333-4444-555555555555' && JSON.parse(endCall.body).conversation_id === 'conv_plus1',
+    'Plus: när samtalet slutar räknas tiden med samtalets nummer');
+  await p10.waitForFunction(() => document.querySelector('#plus-banner-text').textContent.includes('58'), null, { timeout: 3000 }).catch(() => {});
+  check((await p10.evaluate(() => document.querySelector('#plus-banner-text').textContent)).includes('58 AI-minuter kvar'), 'Plus: använd tid dras från minuterna direkt efter samtalet');
+  api.used = 120;
+  await p10.goto(`${BASE}/index.html`);
+  await p10.waitForFunction(() => document.querySelector('#plus-banner-text').textContent.includes('58'), null, { timeout: 5000 }).catch(() => {});
+  check((await p10.locator('#plus-banner-text').innerText()).includes('58 AI-minuter kvar'), 'Plus: minuterna som servern har räknat visas när sidan öppnas igen');
+  check(callsTo('/api/plus/status').length >= 1 && callsTo('/api/plus/status').every((c) => c.auth === `Bearer ${plusToken}`), 'Plus: licenskoden kontrolleras när sidan öppnas');
+
+  // Kundsidan hos Stripe och tillbaka.
+  await p10.locator('#plus-banner').click();
+  await p10.locator('#plus-have').waitFor({ state: 'visible' });
+  await Promise.all([p10.waitForURL(/plus=hantera/), p10.getByRole('button', { name: 'Ändra kort eller säg upp' }).click()]);
+  await p10.locator('[data-screen="plus"]').waitFor({ state: 'visible', timeout: 5000 });
+  check(callsTo('/api/plus/portal')[0]?.method === 'POST' && callsTo('/api/plus/portal')[0]?.auth === `Bearer ${plusToken}`, 'Plus: Ändra kort eller säg upp öppnar Stripes kundsida');
+
+  // Ångerknappen längst ned på sidan.
+  await p10.locator('footer a[href="?angra=1"]').click();
+  await p10.locator('[data-screen="angra"]').waitFor({ state: 'visible', timeout: 5000 });
+  const contract = await p10.locator('#angra-contract').innerText();
+  check(contract.includes('sub_test1') && contract.includes(new Date((nowSec - 86400) * 1000).toLocaleDateString('sv-SE')), 'Ånger: det står vilket köp som ångras och när det gjordes');
+  check(await p10.locator('#angra-send').isDisabled(), 'Ånger: knappen fungerar inte förrän namn och bekräftelse finns');
+  await p10.locator('#angra-name').fill('Kim Test');
+  check(await p10.locator('#angra-send').isDisabled(), 'Ånger: bara namnet räcker inte');
+  await p10.locator('#angra-ok').check();
+  check(await p10.locator('#angra-send').isEnabled() && (await p10.locator('#angra-send').innerText()) === 'Ångra köpet', 'Ånger: med namn och bekräftelse går det att ångra');
+  await p10.locator('#angra-send').click();
+  await p10.locator('#angra-result').waitFor({ state: 'visible', timeout: 5000 });
+  const withdrawCall = callsTo('/api/plus/angra')[0];
+  check(withdrawCall && withdrawCall.auth === `Bearer ${plusToken}` && JSON.parse(withdrawCall.body).namn === 'Kim Test' && JSON.parse(withdrawCall.body).bekraftat === true,
+    'Ånger: namnet och bekräftelsen skickas med licenskoden');
+  check((await p10.locator('#angra-result').innerText()).startsWith('Köpet är ångrat. Vi tog emot din ånger') && await p10.locator('#angra-form').isHidden(), 'Ånger: bekräftelsen visar när ångern togs emot');
+  check((await storage('plus-licens')) === null, 'Ånger: Plus tas bort från mobilen');
+  await p10.locator('[data-screen="angra"] [data-action="to-start"]').click();
+  check((await p10.locator('#plus-banner-text').innerText()).includes('60 AI-minuter i månaden'), 'Ånger: hemskärmen visar gratis igen');
+
+  // Avbrutet köp och köp som inte är igång.
+  await p10.goto(`${BASE}/index.html?plus=avbrutet`);
+  await p10.locator('#plus-message').waitFor({ state: 'visible', timeout: 5000 });
+  check((await p10.locator('#plus-message').innerText()) === 'Köpet avbröts. Inget har dragits.', 'Plus: ett avbrutet köp säger att inget har dragits');
+  api.info = { available: false };
+  await p10.goto(`${BASE}/index.html`);
+  await p10.locator('#plus-banner').click();
+  await p10.locator('#plus-unavailable').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  check(await p10.locator('#plus-unavailable').isVisible() && await p10.locator('#plus-buy-btn').isDisabled(), 'Plus: utan Stripe-nyckel går det inte att köpa, och det står varför');
+
+  // Gratis: tiden med AI-motspelaren räknas i mobilen, 5 minuter, sedan en väg till Plus.
+  api.info = { available: true, test: true, price: 99 };
+  await p10.goto(`${BASE}/index.html`);
+  plusInit = null;
+  await p10.locator('.tile[data-action="play-scenes"]').click();
+  await p10.locator('#age-ok').check();
+  await p10.locator('#age-continue').click();
+  await p10.locator('.scene').first().click();
+  await p10.locator('#role-buttons button').first().click();
+  await p10.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p10.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p10.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check((await p10.locator('#ai-minutes').innerText()) === '5 gratisminuter kvar', 'Gratis: 5 minuter med AI-motspelaren att prova');
+  const startsBefore = callsTo('/api/ai-start').length;
+  await p10.locator('#start-rec').click();
+  await p10.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  for (let i = 0; i < 80 && !plusInit; i++) await sleep(50);
+  check(callsTo('/api/ai-start').slice(startsBefore).every((c) => c.auth === ''), 'Gratis: AI-motspelaren startas utan licenskod');
+  await sleep(300);
+  await p10.locator('#stop-rec').click();
+  await p10.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  await p10.waitForFunction(() => localStorage.getItem('ai-gratis-sekunder') === '120', null, { timeout: 3000 }).catch(() => {});
+  check((await storage('ai-gratis-sekunder')) === '120', 'Gratis: använd tid räknas i mobilen');
+
+  await p10.evaluate(() => localStorage.setItem('ai-gratis-sekunder', '300'));
+  await p10.goto(`${BASE}/index.html`);
+  await p10.locator('.tile[data-action="improv"]').click();
+  await p10.locator('#age-ok').check();
+  await p10.locator('#age-continue').click();
+  await p10.locator('[data-screen="pick"]').waitFor({ state: 'visible' });
+  check((await p10.locator('#pick-notice').innerText()).includes('5 gratisminuter') && await p10.locator('#pick-list .scene').first().isDisabled() &&
+    await p10.locator('#pick-notice [data-action="to-plus"]').isVisible(), 'Gratis: när de 5 AI-minuterna är slut går improvisation inte att starta, och Plus erbjuds');
+  await p10.goto(`${BASE}/index.html`);
+  await p10.locator('.tile[data-action="play-scenes"]').click();
+  await p10.locator('#age-ok').check();
+  await p10.locator('#age-continue').click();
+  await p10.locator('.scene').first().click();
+  await p10.locator('#role-buttons button').first().click();
+  await p10.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p10.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p10.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p10.locator('#mode-ai').isDisabled() && !(await p10.locator('#mode-ai').isChecked()) && await p10.locator('#ai-paywall').isVisible(),
+    'Gratis: när minuterna är slut går AI inte att välja i scener, och det står varför');
+  check((await p10.locator('#rec-max').innerText()) === '3:00', 'Gratis: en tagning kan vara upp till 3 minuter');
+
+  const p10odd = p10requests.filter((r) => !(r.url.startsWith(BASE) || r.url.startsWith('blob:')) ||
+    (r.method !== 'GET' && !/\/api\/(ai-end|plus\/(checkout|portal|angra))$/.test(new URL(r.url).pathname)));
+  check(p10odd.length === 0, `Plus: bara köpet, kundsidan, ångern och AI-tiden skickas (${p10odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  check(p10errors.length === 0, `Inga fel med Plus (${p10errors.join(' | ') || 'inga'})`);
+  await p10ctx.close();
 } finally {
   await browser.close();
   server.kill();

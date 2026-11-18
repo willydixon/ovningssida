@@ -89,6 +89,13 @@ check(WARMUP.length === 4 && WARMUP.every((w) => w.titel && w.text && (w.sekunde
 const breath = WARMUP.find((w) => w.andning);
 check(!!breath && breath.andning.reduce((sum, [, sec]) => sum + sec, 0) * 3 === breath.sekunder, 'Andningen går jämnt upp i tre varv');
 
+// ---- Mina tagningar ----
+const { FREE_TAKES, canSaveMore, takeId, isQuotaError } = await import('../public/takes.js');
+check(FREE_TAKES === 3 && canSaveMore(2, 'gratis') && !canSaveMore(3, 'gratis') && !canSaveMore(5, 'gratis'), 'Gratis får spara 3 tagningar i Mina tagningar');
+check(canSaveMore(3, 'plus') && canSaveMore(500, 'plus'), 'Med Plus finns ingen gräns för Mina tagningar');
+check(takeId(1000, () => 0.5) !== takeId(1001, () => 0.5) && /^t[0-9a-z]+$/.test(takeId()), 'Varje tagning får ett eget nummer');
+check(isQuotaError({ name: 'QuotaExceededError' }) && !isQuotaError(new Error('annat')) && !isQuotaError(null), 'Fullt i mobilen känns igen');
+
 // ---- Texterna ----
 // Alla texter ligger i texts.js. Sidorna i templates/ och manifest.json skapas från dem.
 const templates = await readTemplates();

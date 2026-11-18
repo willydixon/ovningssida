@@ -552,7 +552,7 @@ try {
   check((await p8.locator('#daily-text').innerText()) === challengeFor(new Date()), 'Hemskärmen visar dagens utmaning');
   check(await p8.evaluate(() => document.fonts.check('700 20px Fraunces') && document.fonts.check('400 16px Inter')), 'Typsnitten Fraunces och Inter laddas från den egna sidan');
   check(await p8.locator('#tabbar').isVisible() && (await p8.locator('#tabbar [aria-current="page"]').innerText()).includes('Hem'), 'Menyn längst ned syns och Hem är vald');
-  check((await p8.locator('.tile.soon').count()) === 1 && (await p8.locator('button.tile').count()) === 5, 'Hemskärmen: fem övningar fungerar och Mina tagningar är märkt Snart');
+  check((await p8.locator('.tile.soon').count()) === 0 && (await p8.locator('button.tile').count()) === 6, 'Hemskärmen: fem övningar och Mina tagningar fungerar');
 
   // Uppvärmningen behöver ingen kamera.
   await p8.locator('.tile[data-action="warmup"]').click();
@@ -893,6 +893,133 @@ try {
   check(p10odd.length === 0, `Plus: bara köpet, kundsidan, ångern och AI-tiden skickas (${p10odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
   check(p10errors.length === 0, `Inga fel med Plus (${p10errors.join(' | ') || 'inga'})`);
   await p10ctx.close();
+
+  // ---- 11. Mina tagningar ----
+  const p11ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p11ctx.route('**/api/**', (route) => {
+    const u = new URL(route.request().url());
+    if (u.pathname === '/api/ai-start') return route.fulfill({ json: { available: false } });
+    if (u.pathname === '/api/plus/info') return route.fulfill({ json: { available: true, test: true, price: 99 } });
+    return route.fulfill({ status: 404, json: { error: 'not_found' } });
+  });
+  const p11 = await p11ctx.newPage();
+  const p11errors = [];
+  const p11requests = [];
+  p11.on('console', (m) => { if (m.type() === 'error') p11errors.push(m.text()); });
+  p11.on('pageerror', (e) => p11errors.push(String(e)));
+  p11.on('request', (r) => p11requests.push({ url: r.url(), method: r.method() }));
+  const recordScene = async (seconds = 2) => {
+    await p11.goto(`${BASE}/index.html`);
+    await p11.locator('.tile[data-action="play-scenes"]').click();
+    await p11.locator('#age-ok').check();
+    await p11.locator('#age-continue').click();
+    await p11.locator('.scene').first().click();
+    await p11.locator('#role-buttons button').first().click();
+    await p11.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+    await p11.getByRole('button', { name: 'Till inspelningen' }).click();
+    await p11.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+    await p11.locator('#start-rec').click();
+    await p11.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+    await sleep(seconds * 1000);
+    await p11.locator('#stop-rec').click();
+    await p11.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+    await p11.getByRole('button', { name: 'Spara' }).click();
+    await p11.locator('[data-screen="save"]').waitFor({ state: 'visible' });
+  };
+
+  await p11.goto(`${BASE}/index.html`);
+  await p11.locator('.tile[data-action="takes"]').click();
+  await p11.locator('[data-screen="takes"]').waitFor({ state: 'visible' });
+  await p11.locator('#takes-empty').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  check(await p11.locator('#takes-empty').isVisible() && (await p11.locator('#takes-count').innerText()) === '0 av 3 gratisplatser används.', 'Mina tagningar: tomt från början, med 3 gratisplatser');
+
+  await recordScene(2);
+  check(await p11.locator('#save-take-btn').isEnabled() && (await p11.locator('#h-save').innerText()) === 'Spara tagningen', 'Mina tagningar: tagningen kan sparas i appen');
+  await p11.locator('#save-take-btn').click();
+  await p11.locator('#save-take-status').waitFor({ state: 'visible', timeout: 5000 });
+  check((await p11.locator('#save-take-text').innerText()) === 'Sparad i Mina tagningar.' && await p11.locator('#save-take-btn').isDisabled(), 'Mina tagningar: tagningen sparas och kan inte sparas två gånger');
+  await p11.locator('#save-take-open').click();
+  await p11.locator('.take').first().waitFor({ timeout: 5000 });
+  const sceneTitle = SCENES[0].titel;
+  const firstRole = SCENES[0].roller[0].namn;
+  const meta = await p11.locator('.take .take-text span').first().innerText();
+  check((await p11.locator('.take').count()) === 1 && (await p11.locator('.take strong').first().innerText()) === sceneTitle && meta.startsWith(`Som ${firstRole} · `) && / · 0:0[1-4]$/.test(meta),
+    `Mina tagningar: tagningen visas med scen, roll, tid och längd (${meta})`);
+  check((await p11.locator('#takes-count').innerText()) === '1 av 3 gratisplatser används.' && await p11.locator('#takes-unsaved').isHidden(), 'Mina tagningar: en av tre platser används');
+
+  // Tagningen finns kvar när sidan öppnas igen.
+  await p11.goto(`${BASE}/index.html`);
+  await p11.locator('.tile[data-action="takes"]').click();
+  await p11.locator('.take').first().waitFor({ timeout: 5000 });
+  await p11.locator('.take').first().click();
+  await p11.locator('[data-screen="take"]').waitFor({ state: 'visible' });
+  check((await p11.locator('#h-take').innerText()) === sceneTitle && ((await p11.locator('#take-video').getAttribute('src')) || '').startsWith('blob:'), 'Mina tagningar: tagningen finns kvar och spelas upp från mobilen');
+  const duration = await p11.evaluate(() => new Promise((resolve) => {
+    const v = document.querySelector('#take-video');
+    if (v.readyState >= 1) resolve(v.duration);
+    v.onloadedmetadata = () => resolve(v.duration);
+    setTimeout(() => resolve(-1), 4000);
+  }));
+  check(duration !== -1, `Mina tagningar: videon går att spela (${duration})`);
+  check(/^tagning-\d{8}-\d{4}\.(mp4|webm)$/.test((await p11.locator('#take-download').getAttribute('download')) || ''), 'Mina tagningar: tagningen kan sparas i mobilen');
+
+  // Ta bort kräver en bekräftelse.
+  await p11.locator('#take-delete').click();
+  check(await p11.locator('#take-confirm').isVisible(), 'Mina tagningar: Ta bort frågar först');
+  await p11.getByRole('button', { name: 'Avbryt' }).click();
+  check(await p11.locator('#take-confirm').isHidden() && await p11.locator('#take-delete').isVisible(), 'Mina tagningar: Avbryt tar inte bort något');
+  await p11.locator('#take-delete').click();
+  await p11.locator('#take-delete-yes').click();
+  await p11.locator('[data-screen="takes"]').waitFor({ state: 'visible', timeout: 5000 });
+  await p11.locator('#takes-empty').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  check((await p11.locator('#takes-message').innerText()) === 'Tagningen är borttagen.' && (await p11.locator('.take').count()) === 0, 'Mina tagningar: tagningen tas bort');
+
+  // Gratis får plats med 3. Den fjärde får man göra plats för, eller skaffa Plus.
+  await p11.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => { const r = indexedDB.open('ovningssida', 1); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+    const tx = db.transaction('tagningar', 'readwrite');
+    for (let i = 0; i < 3; i++) {
+      tx.objectStore('tagningar').add({ id: `gammal${i}`, skapad: Date.now() - (i + 1) * 3600000, titel: `Gammal ${i}`, roll: '', sekunder: 30 + i, typ: 'video/webm', storlek: 4, video: new Blob(['test'], { type: 'video/webm' }) });
+    }
+    await new Promise((resolve) => { tx.oncomplete = resolve; });
+  });
+  await recordScene(1);
+  await p11.locator('#save-take-btn').click();
+  await p11.locator('#save-take-status').waitFor({ state: 'visible', timeout: 5000 });
+  check((await p11.locator('#save-take-text').innerText()).startsWith('Mina tagningar har plats för 3 tagningar gratis') && await p11.locator('#save-take-plus').isVisible() && await p11.locator('#save-take-btn').isEnabled(),
+    'Mina tagningar: när 3 är sparade erbjuds Plus, och ingen tagning tas bort av sig själv');
+  await p11.locator('#save-take-open').click();
+  await p11.locator('.take').first().waitFor({ timeout: 5000 });
+  check((await p11.locator('.take').count()) === 3 && await p11.locator('#takes-unsaved').isVisible() && (await p11.locator('.take strong').first().innerText()) === 'Gammal 0',
+    'Mina tagningar: listan visar de 3 sparade, nyast först, och att den nya inte är sparad än');
+  await p11.locator('.take').last().click();
+  await p11.locator('#take-delete').click();
+  await p11.locator('#take-delete-yes').click();
+  await p11.locator('[data-screen="takes"]').waitFor({ state: 'visible', timeout: 5000 });
+  await p11.locator('#takes-unsaved [data-action="to-save"]').click();
+  await p11.locator('[data-screen="save"]').waitFor({ state: 'visible' });
+  await p11.locator('#save-take-btn').click();
+  await p11.locator('#save-take-text').filter({ hasText: 'Sparad' }).waitFor({ timeout: 5000 }).catch(() => {});
+  check((await p11.locator('#save-take-text').innerText()) === 'Sparad i Mina tagningar.', 'Mina tagningar: efter att en gammal tagning tagits bort får den nya plats');
+
+  // Med Plus finns ingen gräns.
+  const plusPayload11 = { plan: 'plus', sub: 'sub_t', cus: 'cus_t', start: nowSec, exp: nowSec + 3600 };
+  const plusToken11 = `v1.${Buffer.from(JSON.stringify(plusPayload11)).toString('base64url')}.x`;
+  await p11ctx.route('**/api/plus/status', (route) => route.fulfill({ json: { plan: 'plus', token: plusToken11, usedSeconds: 0, limitSeconds: 3600 } }));
+  await p11.evaluate((tok) => localStorage.setItem('plus-licens', tok), plusToken11);
+  await recordScene(1);
+  await p11.locator('#save-take-btn').click();
+  await p11.locator('#save-take-status').waitFor({ state: 'visible', timeout: 5000 });
+  check((await p11.locator('#save-take-text').innerText()) === 'Sparad i Mina tagningar.', 'Mina tagningar: med Plus går det att spara en fjärde tagning');
+  await p11.locator('#save-take-open').click();
+  await p11.locator('.take').first().waitFor({ timeout: 5000 });
+  check((await p11.locator('.take').count()) === 4 && (await p11.locator('#takes-count').innerText()).startsWith('Med Plus kan du spara hur många'), 'Mina tagningar: med Plus syns ingen gräns');
+
+  const p11odd = p11requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
+  check(p11odd.length === 0, `Mina tagningar skickar inget över nätet (${p11odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  const p11real = p11errors.filter((e) => !/404/.test(e));
+  check(p11real.length === 0, `Inga fel i Mina tagningar (${p11real.join(' | ') || 'inga'})`);
+  await p11ctx.close();
 } finally {
   await browser.close();
   server.kill();

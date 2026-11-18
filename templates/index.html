@@ -42,7 +42,7 @@
       <button type="button" class="tile" data-action="fiveways">{{icon:drama}}<strong>{{tile_fiveways}}</strong><span>{{tile_fiveways_text}}</span></button>
       <button type="button" class="tile" data-action="warmup">{{icon:audio-lines}}<strong>{{tile_warmup}}</strong><span>{{tile_warmup_text}}</span></button>
       <button type="button" class="tile" data-action="monologue">{{icon:lamp-desk}}<strong>{{tile_monologue}}</strong><span>{{tile_monologue_text}}</span></button>
-      <div class="tile soon">{{icon:film}}<strong>{{tile_takes}}</strong><span>{{tile_takes_text}}</span><em>{{soon}}</em></div>
+      <button type="button" class="tile" data-action="takes">{{icon:film}}<strong>{{tile_takes}}</strong><span>{{tile_takes_text}}</span></button>
     </div>
     <button type="button" class="plus-banner" data-action="to-plus" id="plus-banner">
       {{icon:sparkles}}<span><strong id="plus-banner-title">{{plus_banner_title}}</strong> <span id="plus-banner-text">{{plus_banner_text}}</span></span>
@@ -199,11 +199,20 @@
     </div>
   </section>
 
-  <!-- 7. Spara eller dela -->
+  <!-- 7. Spara i Mina tagningar eller i mobilen -->
   <section data-screen="save" aria-labelledby="h-save" hidden>
     <h1 id="h-save" tabindex="-1">{{save_title}}</h1>
     <p>{{save_text}}</p>
-    <button type="button" class="primary" data-action="share" id="share-btn" hidden>{{save_button_share}}</button>
+    <button type="button" class="primary wide" data-action="save-take" id="save-take-btn">{{icon:film}}{{save_take_button}}</button>
+    <div class="notice" id="save-take-status" hidden>
+      <p id="save-take-text" aria-live="polite"></p>
+      <div class="row">
+        <button type="button" class="secondary" data-action="takes" id="save-take-open">{{save_take_open}}</button>
+        <button type="button" class="primary" data-action="to-plus" id="save-take-plus" hidden>{{plus_read_more}}</button>
+      </div>
+    </div>
+    <h2>{{save_phone_title}}</h2>
+    <button type="button" class="secondary" data-action="share" id="share-btn" hidden>{{save_button_share}}</button>
     <a class="button secondary" id="download-link" href="#" download>{{save_button_download}}</a>
     <p class="small" id="save-status" aria-live="polite"></p>
     <ul class="tips">
@@ -213,6 +222,49 @@
     <div class="row">
       <button type="button" class="ghost" data-action="retake">{{save_button_new_take}}</button>
       <button type="button" class="ghost" data-action="to-scenes">{{button_other_scene}}</button>
+    </div>
+  </section>
+
+  <!-- Mina tagningar -->
+  <section data-screen="takes" aria-labelledby="h-takes" hidden>
+    <h1 id="h-takes" tabindex="-1">{{takes_title}}</h1>
+    <p class="small" id="takes-count"></p>
+    <p class="notice" id="takes-message" aria-live="polite" hidden></p>
+    <div class="notice" id="takes-unsaved" hidden>
+      <p>{{takes_unsaved}}</p>
+      <button type="button" class="primary" data-action="to-save">{{takes_unsaved_back}}</button>
+    </div>
+    <div id="takes-list" class="take-list"></div>
+    <div id="takes-empty" hidden>
+      <p class="lead">{{takes_empty}}</p>
+      <button type="button" class="primary" data-action="play-scenes">{{takes_record}}</button>
+    </div>
+    <p class="small">{{takes_text}}</p>
+    <template id="tpl-play">{{icon:play}}</template>
+  </section>
+
+  <!-- En tagning i Mina tagningar -->
+  <section data-screen="take" aria-labelledby="h-take" hidden>
+    <p class="kicker">{{icon:film}}{{takes_title}}</p>
+    <h1 id="h-take" tabindex="-1"></h1>
+    <p class="small" id="take-meta"></p>
+    <video id="take-video" controls playsinline></video>
+    <p class="small" id="take-error" hidden>{{review_playback_error}}</p>
+    <div class="row">
+      <button type="button" class="secondary" data-action="take-share" id="take-share" hidden>{{save_button_share}}</button>
+      <a class="button secondary" id="take-download" href="#" download>{{save_button_download}}</a>
+    </div>
+    <p class="small" id="take-status" aria-live="polite"></p>
+    <div class="row">
+      <button type="button" class="ghost" data-action="takes">{{take_back}}</button>
+      <button type="button" class="ghost" data-action="take-delete" id="take-delete">{{icon:trash-2}}{{take_delete}}</button>
+    </div>
+    <div class="notice" id="take-confirm" hidden>
+      <p>{{take_delete_confirm}}</p>
+      <div class="row">
+        <button type="button" class="ghost" data-action="take-delete-no">{{take_delete_no}}</button>
+        <button type="button" class="danger" data-action="take-delete-yes" id="take-delete-yes">{{take_delete_yes}}</button>
+      </div>
     </div>
   </section>
 
@@ -230,6 +282,7 @@
           <li>{{plus_free_1}}</li>
           <li>{{plus_free_2}}</li>
           <li>{{plus_free_3}}</li>
+          <li>{{plus_free_4}}</li>
         </ul>
       </div>
       <div class="plan plan-plus">

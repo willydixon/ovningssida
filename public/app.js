@@ -9,6 +9,7 @@ import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, ra
 import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
 import { AiPartner, buildAiSetup } from './ai-partner.js';
 import { challengeFor, WARMUP, fiveWaysScene, MONOLOGUES, monologueScene, IMPROVS, improvScene } from './content.js';
+import { FREE_TAKES, canSaveMore, takeId, listTakes, getTake, addTake, deleteTake, countTakes, isQuotaError } from './takes.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
 // Längsta tagning och AI-minuter beror på planen. Se också netlify/lib/plus.mjs.
@@ -49,6 +50,9 @@ const state = {
   blob: null,
   blobUrl: null,
   file: null,
+  takeSeconds: 0, // hur lång den senaste tagningen blev
+  savedTakeId: null, // satt när tagningen finns i Mina tagningar
+  takeView: null, // tagningen som visas från Mina tagningar: { id, url, file }
   // Motspelaren
   voice: null,
   player: null,
@@ -73,7 +77,7 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 
 // Skärmarna där menyn längst ned syns, och vilken flik som då är vald.
-const TABS = { start: 'start', pick: 'start', plus: 'start', angra: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
+const TABS = { start: 'start', pick: 'start', plus: 'start', angra: 'start', takes: 'start', take: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
 
 function show(name) {
   for (const el of document.querySelectorAll('[data-screen]')) {
@@ -81,6 +85,7 @@ function show(name) {
   }
   if (name !== 'check') cancelAnimationFrame(state.meterRaf);
   if (name !== 'warmup') stopWarmupTimer();
+  if (name !== 'take') releaseTakeView();
   const tab = TABS[name];
   $('#tabbar').hidden = !tab;
   document.body.classList.toggle('with-tabs', !!tab);
@@ -784,6 +789,7 @@ function stopRecording(reason) {
   if (!state.stopReason) state.stopReason = reason || 'user';
   const recorder = state.recorder;
   if (recorder && recorder.state !== 'inactive') {
+    state.takeSeconds = Math.max(1, Math.round((Date.now() - state.recStart) / 1000));
     try { recorder.stop(); } catch { /* redan stoppad */ }
   }
   $('#rec-badge').hidden = true;
@@ -831,6 +837,7 @@ function clearTake() {
   state.blob = null;
   state.blobUrl = null;
   state.file = null;
+  state.savedTakeId = null;
 }
 
 async function retake() {
@@ -1171,7 +1178,186 @@ function toSave() {
   link.href = state.blobUrl;
   link.download = name;
   $('#save-status').textContent = '';
+  $('#save-take-btn').disabled = !!state.savedTakeId;
+  if (state.savedTakeId) saveTakeStatus(t('save_take_already'));
+  else $('#save-take-status').hidden = true;
   show('save');
+}
+
+// ---------- Mina tagningar ----------
+// Tagningarna sparas i webbläsarens databas i mobilen (takes.js) och skickas aldrig någonstans.
+
+// Rollen skrivs bara ut för scener med två roller, inte för övningar där man spelar sig själv.
+function roleName() {
+  const scene = state.scene;
+  if (!scene || scene.typ || !scene.roller || scene.roller.length < 2) return '';
+  const role = scene.roller.find((r) => r.id === state.role);
+  return role ? role.namn : '';
+}
+
+function saveTakeStatus(message, { open = true, plus = false } = {}) {
+  $('#save-take-text').textContent = message;
+  $('#save-take-open').hidden = !open;
+  $('#save-take-plus').hidden = !plus;
+  $('#save-take-status').hidden = false;
+}
+
+async function saveToTakes() {
+  if (!state.blob) return;
+  if (state.savedTakeId) {
+    saveTakeStatus(t('save_take_already'));
+    return;
+  }
+  const button = $('#save-take-btn');
+  button.disabled = true;
+  try {
+    const count = await countTakes();
+    if (!canSaveMore(count, state.plan)) {
+      saveTakeStatus(t('takes_full', { max: FREE_TAKES }), { plus: state.plan !== 'plus' });
+      button.disabled = false;
+      return;
+    }
+    const id = takeId();
+    await addTake({
+      id,
+      skapad: Date.now(),
+      titel: state.scene ? state.scene.titel : '',
+      roll: roleName(),
+      sekunder: state.takeSeconds,
+      typ: state.blob.type,
+      storlek: state.blob.size,
+      video: state.blob
+    });
+    state.savedTakeId = id;
+    saveTakeStatus(t('save_take_done'));
+  } catch (err) {
+    saveTakeStatus(t(isQuotaError(err) ? 'takes_no_space' : 'takes_failed'), { open: false });
+    button.disabled = false;
+  }
+}
+
+const takeDate = (ms) => new Date(ms).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+function takeMeta(take) {
+  const values = { role: take.roll, date: takeDate(take.skapad), length: clock(take.sekunder || 0) };
+  return t(take.roll ? 'take_meta_role' : 'take_meta', values);
+}
+
+async function showTakes(message = '') {
+  stopCamera();
+  const msg = $('#takes-message');
+  msg.textContent = message;
+  msg.hidden = !message;
+  $('#takes-unsaved').hidden = !(state.blob && !state.savedTakeId);
+  const list = $('#takes-list');
+  list.textContent = '';
+  $('#takes-empty').hidden = true;
+  $('#takes-count').textContent = '';
+  show('takes');
+  let takes;
+  try {
+    takes = await listTakes();
+  } catch {
+    $('#takes-count').textContent = t('takes_failed');
+    return;
+  }
+  const n = takes.length;
+  if (state.plan === 'plus') $('#takes-count').textContent = t('takes_count_plus', { n });
+  else $('#takes-count').textContent = t(n > FREE_TAKES ? 'takes_count_over' : 'takes_count_free', { n, max: FREE_TAKES });
+  $('#takes-empty').hidden = n > 0;
+  const play = $('#tpl-play');
+  for (const take of takes) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'take';
+    button.dataset.action = 'open-take';
+    button.dataset.id = take.id;
+    const icon = document.createElement('span');
+    icon.className = 'take-play';
+    icon.append(play.content.cloneNode(true));
+    const text = document.createElement('span');
+    text.className = 'take-text';
+    const title = document.createElement('strong');
+    title.textContent = take.titel || t('take_untitled');
+    const meta = document.createElement('span');
+    meta.textContent = takeMeta(take);
+    text.append(title, meta);
+    button.append(icon, text);
+    list.append(button);
+  }
+}
+
+function releaseTakeView() {
+  if (!state.takeView) return;
+  const video = $('#take-video');
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  URL.revokeObjectURL(state.takeView.url);
+  state.takeView = null;
+}
+
+async function openTake(id) {
+  let take = null;
+  try { take = await getTake(id); } catch { take = null; }
+  if (!take || !take.video) {
+    showTakes(t('take_missing'));
+    return;
+  }
+  releaseTakeView();
+  const url = URL.createObjectURL(take.video);
+  const ext = (take.typ || '').includes('webm') ? 'webm' : 'mp4';
+  const stampOf = (ms) => {
+    const d = new Date(ms);
+    const p = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  };
+  const name = `${t('file_prefix')}-${stampOf(take.skapad)}.${ext}`;
+  let file = null;
+  try { file = new File([take.video], name, { type: take.typ || take.video.type }); } catch { file = null; }
+  state.takeView = { id, url, file };
+  $('#h-take').textContent = take.titel || t('take_untitled');
+  $('#take-meta').textContent = takeMeta(take);
+  const video = $('#take-video');
+  $('#take-error').hidden = true;
+  video.onerror = () => { $('#take-error').hidden = false; };
+  video.src = url;
+  let canShare = false;
+  try { canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] })); } catch { canShare = false; }
+  $('#take-share').hidden = !canShare;
+  const link = $('#take-download');
+  link.href = url;
+  link.download = name;
+  $('#take-status').textContent = '';
+  $('#take-confirm').hidden = true;
+  $('#take-delete').hidden = false;
+  show('take');
+}
+
+async function shareTake() {
+  if (!state.takeView || !state.takeView.file) return;
+  try {
+    await navigator.share({ files: [state.takeView.file] });
+    $('#take-status').textContent = t('save_shared');
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    $('#take-status').textContent = t('save_share_failed');
+  }
+}
+
+async function deleteShownTake() {
+  if (!state.takeView) return;
+  const { id } = state.takeView;
+  $('#take-delete-yes').disabled = true;
+  try {
+    await deleteTake(id);
+    if (state.savedTakeId === id) state.savedTakeId = null;
+    await showTakes(t('takes_deleted'));
+  } catch {
+    $('#take-status').textContent = t('takes_failed');
+  } finally {
+    $('#take-delete-yes').disabled = false;
+  }
 }
 
 async function share() {
@@ -1482,6 +1668,13 @@ document.addEventListener('click', (event) => {
     case 'retake': retake(); break;
     case 'to-save': toSave(); break;
     case 'share': share(); break;
+    case 'save-take': saveToTakes(); break;
+    case 'takes': showTakes(); break;
+    case 'open-take': openTake(target.dataset.id); break;
+    case 'take-share': shareTake(); break;
+    case 'take-delete': $('#take-confirm').hidden = false; $('#take-delete').hidden = true; break;
+    case 'take-delete-no': $('#take-confirm').hidden = true; $('#take-delete').hidden = false; break;
+    case 'take-delete-yes': deleteShownTake(); break;
     case 'retry-camera': retryCamera(); break;
     default: break;
   }

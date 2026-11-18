@@ -28,7 +28,8 @@ William valde 18 november 2026 utseendet Premiär bland tre förslag (`design/fo
 - Uppvärmningen har fyra steg utan kamera: andning med en cirkel i takt, läppar och tunga, tungvrickare och rösten i rummet.
 - Scenerna har egna SVG-bilder i `public/img/`, som `tools/render-pages.mjs` ritar från `tools/scene-art.mjs`, och en genre.
 - Ikonerna kommer från Lucide (ISC-licens) och ligger i `tools/icons/`. I mallarna skrivs de som `{{icon:namn}}`.
-- Improvisera med AI, En replik fem sätt och Monolog finns. Mina tagningar, Din spelstil och fler språk (svenska och engelska först, sedan spanska, tyska och franska) byggs härnäst.
+- Improvisera med AI, En replik fem sätt och Monolog finns. Din spelstil och fler språk (svenska och engelska först, sedan spanska, tyska och franska) byggs härnäst.
+- Mina tagningar (`public/takes.js`) sparar tagningar som användaren väljer att spara i webbläsarens databas (IndexedDB) i mobilen. Inget laddas upp. Gratis får 3 tagningar plats, Plus obegränsat. Ingen tagning tas bort utan att användaren själv bekräftar det.
 
 ## AI-motspelaren (test)
 

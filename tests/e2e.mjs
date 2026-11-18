@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SCENES } from '../public/scenes.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -61,7 +62,7 @@ try {
 
   await page.locator('.scene').first().click();
   check(await page.locator('#role-pick').isVisible(), 'Scen: rollvalet visas');
-  check((await page.locator('.scene .badge').count()) === 3, 'Scen: alla tre scener är märkta som utkast');
+  check((await page.locator('.scene .badge').count()) === SCENES.length, `Scen: alla ${SCENES.length} scener är märkta som utkast`);
   await page.locator('#role-buttons button').first().click();
   await page.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
   check((await page.evaluate(() => window.__gum)) === 1, 'Kameran startade först efter rollvalet');
@@ -214,7 +215,6 @@ try {
   // ---- 6. Motspelaren läser repliker ----
   // Talsyntesen byts mot en falsk med en svensk röst som "läser" i 1,2 s, och
   // mikrofonen mot en ton som testet slår på och av, som om användaren pratar.
-  const { SCENES } = await import('../public/scenes.js');
   const lines = SCENES[0].repliker;
   const p6ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
   await p6ctx.route('**/api/ai-start**', (route) => route.fulfill({ json: { available: false } }));
@@ -592,7 +592,14 @@ try {
   await p8.locator('[data-screen="save"] [data-action="to-scenes"]').click();
   await p8.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
   const images = await p8.$$eval('.scene-img', (imgs) => imgs.map((i) => i.complete && i.naturalWidth > 0));
-  check(images.length === 3 && images.every(Boolean), 'Scenerna har bilder som laddas');
+  check(images.length === SCENES.length && images.every(Boolean), `Scenerna har bilder som laddas (${images.length})`);
+  const chips = await p8.locator('#genre-chips .chip').allInnerTexts();
+  check(chips.join(',') === 'Alla,Drama,Komedi,Thriller,Romantik' && (await p8.locator('#genre-chips [aria-pressed="true"]').innerText()) === 'Alla', `Scenerna kan väljas efter genre (${chips.join(', ')})`);
+  await p8.locator('#genre-chips .chip', { hasText: 'Thriller' }).click();
+  const thrillers = await p8.locator('.scene strong').allInnerTexts();
+  check(thrillers.length === SCENES.filter((x) => x.genre === 'Thriller').length && thrillers.includes('Samtalet klockan tre') && (await p8.locator('#genre-chips [aria-pressed="true"]').innerText()) === 'Thriller',
+    'Genren Thriller visar bara thrillrarna');
+  await p8.locator('#genre-chips .chip', { hasText: 'Alla' }).click();
   check((await p8.locator('.scene .tag').first().innerText()).toLowerCase() === 'drama', 'Scenerna visar genre');
   await p8.locator('.scene').first().click();
   await p8.locator('#role-buttons button').first().click();

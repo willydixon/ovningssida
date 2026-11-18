@@ -98,5 +98,67 @@ export const SCENES = [
     godkand_av: null,
     godkand_datum: null,
     version: 1
+  },
+  {
+    id: 'scen-004',
+    titel: 'Samtalet klockan tre',
+    genre: 'Thriller',
+    bild: 'phone',
+    situation: 'Klockan är tre på natten. Charlies mobil ringer, och på skärmen står Charlies eget nummer.',
+    langd_sekunder: 90,
+    roller: [
+      { id: 'A', namn: 'Charlie', vill: 'Ta reda på vem som ringer, utan att visa hur rädd du är.', inre: 'Är ensam hemma och har inte sovit ordentligt sedan syskonet Eli försvann efter ett bråk för ett år sedan. Har letat varje dag.' },
+      { id: 'B', namn: 'Rösten', vill: 'Få Charlie att gå till fönstret innan samtalet tar slut.', inre: 'Är Charlies syskon Eli, som försvann för ett år sedan efter ett bråk. Ringer med ett nummer som ser ut som Charlies eget, så att Charlie inte ska lägga på. Är rädd att Charlie fortfarande är arg, och leker därför med mystiken lite för länge.' }
+    ],
+    repliker: [
+      { roll: 'A', text: 'Hallå? Vem är det här?' },
+      { roll: 'B', text: 'Du låter trött, Charlie. Har du inte sovit i natt heller?' },
+      { roll: 'A', text: 'Hur vet du vad jag heter? Det står mitt eget nummer på skärmen.' },
+      { roll: 'B', text: 'Jag vet. Annars hade du aldrig svarat.' },
+      { roll: 'A', text: 'Det här är inte roligt. Säg vem du är, annars lägger jag på.' },
+      { roll: 'B', text: 'Du står i köket. Lampan över spisen är tänd, och du har inte druckit ur teet.' },
+      { roll: 'A', text: 'Du kan inte se mig. Gardinerna är fördragna.' },
+      { roll: 'B', text: 'Inte den i köket. Den har du aldrig kunnat stänga ordentligt.' },
+      { roll: 'A', text: 'Hur vet du det? Det vet bara…' },
+      { roll: 'B', text: 'Bara en person till. Gå till fönstret, Charlie.' },
+      { roll: 'A', text: 'Eli? Du har varit borta i ett år.' },
+      { roll: 'B', text: 'Jag vet. Jag står under gatlampan. Får jag komma upp?' }
+    ],
+    status: 'utkast',
+    ai_stod: true,
+    godkand_av: null,
+    godkand_datum: null,
+    version: 1
+  },
+  {
+    id: 'scen-005',
+    titel: 'Sista tåget',
+    genre: 'Romantik',
+    bild: 'train',
+    situation: 'Sista tåget har precis gått. Juno och Billie står kvar på perrongen, och nästa tåg går om fem timmar.',
+    langd_sekunder: 90,
+    roller: [
+      { id: 'A', namn: 'Juno', vill: 'Få Billie att stanna och prata, utan att verka desperat.', inre: 'Missade tåget med flit för att slippa komma hem till en tom lägenhet. Blir rolig när hen är nervös.' },
+      { id: 'B', namn: 'Billie', vill: 'Komma därifrån, fast något får dig att stanna kvar.', inre: 'Friade i kväll och fick nej. Har fortfarande ringen i handen och vill inte gråta inför en främling.' }
+    ],
+    repliker: [
+      { roll: 'A', text: 'Var det där ditt tåg också?' },
+      { roll: 'B', text: 'Det var mitt enda tåg. Nästa går halv sex.' },
+      { roll: 'A', text: 'Då har vi fem timmar. Det är nästan två filmer.' },
+      { roll: 'B', text: 'Jag tänkte mer på att leta efter en taxi.' },
+      { roll: 'A', text: 'En taxi härifrån kostar mer än en månadshyra. Jag har kollat.' },
+      { roll: 'B', text: 'Du låter som någon som missar det här tåget ofta.' },
+      { roll: 'A', text: 'Bara när jag inte vill komma hem.' },
+      { roll: 'B', text: 'Och i kväll ville du inte det?' },
+      { roll: 'A', text: 'Nej. Vad har du i handen? Du har knutit näven sedan tåget gick.' },
+      { roll: 'B', text: 'En ring. Den skulle ha suttit på någon annans finger nu.' },
+      { roll: 'A', text: 'Då har vi båda något att inte åka hem till.' },
+      { roll: 'B', text: 'Fem timmar, sa du? Okej. Berätta om den första filmen.' }
+    ],
+    status: 'utkast',
+    ai_stod: true,
+    godkand_av: null,
+    godkand_datum: null,
+    version: 1
   }
 ];

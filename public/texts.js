@@ -150,6 +150,8 @@ export const sv = {
   // ---- 3. Välj scen och roll ----
   scenes_title: 'Välj en scen',
   scenes_text: 'Alla scener är för två personer. Välj en scen och den roll du vill spela.',
+  genre_label: 'Välj genre',
+  genre_all: 'Alla',
   scene_draft_badge: 'Utkast',
   scene_meta: 'Cirka {length} · {roles} roller · {approval}',
   scene_approved_by: 'Skriven med AI-stöd, godkänd av {name}',

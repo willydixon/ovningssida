@@ -26,7 +26,7 @@ William valde 18 november 2026 utseendet Premiär bland tre förslag (`design/fo
 - Hemskärmen hälsar efter tiden på dygnet, visar dagens utmaning och övningarna. Menyn längst ned syns på hemskärmen, scenerna och uppvärmningen.
 - Dagens utmaning (`public/content.js`) byts varje dag och spelas in som en scen med en roll, utan motspelare.
 - Uppvärmningen har fyra steg utan kamera: andning med en cirkel i takt, läppar och tunga, tungvrickare och rösten i rummet.
-- Scenerna har egna SVG-bilder i `public/img/`, som `tools/render-pages.mjs` ritar från `tools/scene-art.mjs`, och en genre.
+- Scenerna har egna SVG-bilder i `public/img/`, som `tools/render-pages.mjs` ritar från `tools/scene-art.mjs`, och en genre. Det finns fem scener (utkast): två drama, en komedi, en thriller och en romantik, och de kan väljas efter genre.
 - Ikonerna kommer från Lucide (ISC-licens) och ligger i `tools/icons/`. I mallarna skrivs de som `{{icon:namn}}`.
 - Improvisera med AI, En replik fem sätt och Monolog finns. Fler språk (svenska och engelska först, sedan spanska, tyska och franska) byggs härnäst.
 - Din spelstil (`public/style.js`): under tagningen mäts rösten i mobilen var 50:e ms, styrka och tonhöjd (autokorrelation), men inte medan motspelaren eller AI:n pratar. Efter tagningen visas tempo, pauser, tonhöjd och styrka som iakttagelser utan betyg, hur mycket tagningen liknar fem påhittade spelstilar i procent, och en utmaning: spela nästa tagning som den stil som ligger längst bort. Spelstilarna är utkast, bygger bara på rösten och jämförs aldrig med riktiga skådespelare. Gränserna är startvärden som behöver provas på riktiga mobiler. Testerna finns i `tests/style.mjs` och avsnitt 12 i `tests/e2e.mjs`.

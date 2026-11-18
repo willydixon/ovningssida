@@ -345,10 +345,33 @@ function formatLength(seconds) {
   return t('length_minutes', { n: String(minutes).replace('.', ',') });
 }
 
+// Genrerna i den ordning de först förekommer, och den som är vald.
+const GENRES = [...new Set(SCENES.map((s) => s.genre).filter(Boolean))];
+let genreFilter = '';
+
+function renderGenreChips() {
+  const box = $('#genre-chips');
+  box.textContent = '';
+  for (const genre of ['', ...GENRES]) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = genre || t('genre_all');
+    chip.setAttribute('aria-pressed', String(genre === genreFilter));
+    chip.addEventListener('click', () => {
+      genreFilter = genre;
+      renderGenreChips();
+      renderScenes();
+    });
+    box.append(chip);
+  }
+}
+
 function renderScenes() {
   const list = $('#scene-list');
   list.textContent = '';
   for (const scene of SCENES) {
+    if (genreFilter && scene.genre !== genreFilter) continue;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'scene';
@@ -401,6 +424,7 @@ function renderScenes() {
 function pickScene(scene) {
   state.scene = scene;
   $('#scene-list').hidden = true;
+  $('#genre-chips').hidden = true;
   $('#role-pick').hidden = false;
   $('#role-situation').textContent = `${scene.titel}: ${scene.situation}`;
   const buttons = $('#role-buttons');
@@ -418,6 +442,7 @@ function pickScene(scene) {
 
 function resetScenePicker() {
   $('#scene-list').hidden = false;
+  $('#genre-chips').hidden = false;
   $('#role-pick').hidden = true;
 }
 
@@ -1818,6 +1843,7 @@ document.addEventListener('change', (event) => {
   updateModes();
 });
 
+renderGenreChips();
 renderScenes();
 renderHome();
 updateVoice();

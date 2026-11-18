@@ -221,6 +221,19 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .timer { color: var(--accent); font-size: 1.1rem; font-variant-numeric: tabular-nums; font-weight: 700; }
 
 /* Scener */
+.chips { display: flex; gap: 8px; margin: 12px -20px 4px; overflow-x: auto; padding: 2px 20px 6px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--quiet);
+  flex: none;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 40px;
+  padding: 6px 16px;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .scene-list { display: grid; gap: 14px; margin: 16px 0; }
 .scene {
   background: linear-gradient(180deg, var(--surface2), var(--surface));

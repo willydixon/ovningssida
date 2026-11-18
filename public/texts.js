@@ -17,8 +17,8 @@
 export const sv = {
   // ---- Hela sidan ----
   lang: 'sv',
-  page_title: 'Övningssidan, testversion',
-  app_name: 'Övningssidan',
+  page_title: 'ActWith AI, testversion',
+  app_name: 'ActWith AI',
   app_description: 'Öva korta svenska scener och spela in dig själv med mobilens kamera. Videon stannar i mobilen.',
   test_band: 'Testversion. Scenerna är utkast och inte granskade än.',
   lang_other: 'English',
@@ -383,7 +383,7 @@ export const sv = {
   honeypot_label: 'Lämna det här fältet tomt',
 
   // ---- Anmälan (anmalan.html och tack.html) ----
-  signup_page_title: 'Anmälan, Övningssidan',
+  signup_page_title: 'Anmälan, ActWith AI',
   signup_title: 'Få ett mejl när något nytt finns',
   signup_lead: 'Vi mejlar när det kommer nya scener och när appen går att ladda ned. Du kan när som helst be oss ta bort din adress.',
   signup_email_label: 'Din e-post',
@@ -395,18 +395,18 @@ export const sv = {
   signup_source_friend: 'Från en vän',
   signup_source_other: 'Annat',
   signup_android_label: 'Jag vill testa appen för Android när den finns',
-  signup_consent_label: 'Ja, ni får spara min e-post och mejla mig om övningssidan.',
+  signup_consent_label: 'Ja, ni får spara min e-post och mejla mig om ActWith AI.',
   signup_button: 'Anmäl mig',
-  thanks_page_title: 'Tack, Övningssidan',
+  thanks_page_title: 'Tack, ActWith AI',
   thanks_title: 'Tack, du är anmäld',
   thanks_text: 'Vi mejlar när det finns något nytt. Vill du att vi tar bort din adress kan du mejla oss, så gör vi det.',
 
   // ---- Frågor till skådespelare (fragor.html och fragor-tack.html) ----
   // Fråga 1 och 2 kommer från intervjuguiden i analysdokumentet. Frågorna om att
   // betala togs bort när appen blev gratis för skådespelare.
-  questions_page_title: 'Frågor till skådespelare, Övningssidan',
+  questions_page_title: 'Frågor till skådespelare, ActWith AI',
   questions_title: 'Frågor till skådespelare och lärare',
-  questions_lead: 'Hjälp oss bygga rätt sak. Svara på det du vill. Svaren läses av en människa och används bara för att utveckla övningssidan.',
+  questions_lead: 'Hjälp oss bygga rätt sak. Svara på det du vill. Svaren läses av en människa och används bara för att utveckla ActWith AI.',
   questions_role_label: 'Jag är',
   questions_role_actor: 'Skådespelare',
   questions_role_teacher: 'Lärare eller kursledare',
@@ -420,9 +420,9 @@ export const sv = {
   questions_email_label: 'Din e-post, om du vill ha ett mejl',
   questions_consent_label: 'Ja, ni får spara mina svar i högst 12 månader.',
   questions_button: 'Skicka svaren',
-  questions_thanks_page_title: 'Tack för svaren, Övningssidan',
+  questions_thanks_page_title: 'Tack för svaren, ActWith AI',
   questions_thanks_title: 'Tack för dina svar',
-  questions_thanks_text: 'Svaren hjälper oss att göra övningssidan bättre.'
+  questions_thanks_text: 'Svaren hjälper oss att göra ActWith AI bättre.'
 };
 
 // ---- Engelska ----
@@ -430,8 +430,8 @@ export const sv = {
 export const en = {
   // ---- Whole page ----
   lang: 'en',
-  page_title: 'Övningssidan, test version',
-  app_name: 'Övningssidan',
+  page_title: 'ActWith AI, test version',
+  app_name: 'ActWith AI',
   app_description: 'Practise short scenes and record yourself with your phone camera. The video stays on your phone.',
   test_band: 'Test version. The scenes are drafts and have not been reviewed yet.',
   lang_other: 'Svenska',
@@ -788,7 +788,7 @@ export const en = {
   honeypot_label: 'Leave this field empty',
 
   // ---- Signup ----
-  signup_page_title: 'Sign up, Övningssidan',
+  signup_page_title: 'Sign up, ActWith AI',
   signup_title: 'Get an email when something new arrives',
   signup_lead: 'We email you when there are new scenes and when the app can be downloaded. You can ask us to delete your address at any time.',
   signup_email_label: 'Your email',
@@ -800,16 +800,16 @@ export const en = {
   signup_source_friend: 'From a friend',
   signup_source_other: 'Other',
   signup_android_label: 'I want to test the Android app when it exists',
-  signup_consent_label: 'Yes, you may save my email and email me about Övningssidan.',
+  signup_consent_label: 'Yes, you may save my email and email me about ActWith AI.',
   signup_button: 'Sign me up',
-  thanks_page_title: 'Thank you, Övningssidan',
+  thanks_page_title: 'Thank you, ActWith AI',
   thanks_title: 'Thank you, you are signed up',
   thanks_text: 'We will email you when there is something new. If you want us to delete your address, email us and we will.',
 
   // ---- Questions for actors ----
-  questions_page_title: 'Questions for actors, Övningssidan',
+  questions_page_title: 'Questions for actors, ActWith AI',
   questions_title: 'Questions for actors and teachers',
-  questions_lead: 'Help us build the right thing. Answer what you like. The answers are read by a human and are only used to develop Övningssidan.',
+  questions_lead: 'Help us build the right thing. Answer what you like. The answers are read by a human and are only used to develop ActWith AI.',
   questions_role_label: 'I am',
   questions_role_actor: 'An actor',
   questions_role_teacher: 'A teacher or course leader',
@@ -823,9 +823,9 @@ export const en = {
   questions_email_label: 'Your email, if you want an email',
   questions_consent_label: 'Yes, you may save my answers for at most 12 months.',
   questions_button: 'Send the answers',
-  questions_thanks_page_title: 'Thank you for your answers, Övningssidan',
+  questions_thanks_page_title: 'Thank you for your answers, ActWith AI',
   questions_thanks_title: 'Thank you for your answers',
-  questions_thanks_text: 'The answers help us make Övningssidan better.'
+  questions_thanks_text: 'The answers help us make ActWith AI better.'
 };
 
 export const TEXTS = { sv, en };

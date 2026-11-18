@@ -1233,7 +1233,8 @@ try {
   await p13.waitForURL(/\/en\/$/);
   await p13.evaluate(() => document.fonts.ready);
   check((await p13.getAttribute('html', 'lang')) === 'en' && ['Good morning.', 'Hi.', 'Good evening.', 'Good night.'].includes(await p13.locator('#h-start').innerText()), 'Språk: den engelska hemskärmen hälsar på engelska');
-  const visible = (await p13.locator('body').innerText()).replace(/Övningssidan|Svenska/gi, ''); // appens namn visas med versaler
+  const visible = (await p13.locator('body').innerText()).replace(/Svenska/g, ''); // länken till svenska är på svenska
+  check((await p13.locator('.appname').innerText()) === 'ActWith AI' && (await p13.title()) === 'ActWith AI, test version', 'Språk: appen heter ActWith AI, skrivet med stort A och W');
   check(!/[åäöÅÄÖ]/.test(visible), 'Språk: ingen svensk text syns på den engelska hemskärmen');
   check((await p13.locator('.lang-link').innerText()) === 'Svenska' && (await p13.locator('.lang-link').getAttribute('href')) === '../', 'Språk: den engelska hemskärmen har en länk tillbaka till svenska');
 

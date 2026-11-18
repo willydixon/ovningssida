@@ -1,4 +1,4 @@
-// Övningssidan, testversion.
+// ActWith AI, testversion.
 // Allt körs i mobilen. Inspelningen hålls i webbläsarens minne och skickas aldrig
 // någonstans. Sidans säkerhetspolicy (connect-src) tillåter bara anrop till den
 // egna sidan och till AI-motspelaren hos ElevenLabs, som bara får ljud och bara

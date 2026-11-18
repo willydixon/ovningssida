@@ -1,7 +1,7 @@
 // Enhetstester utan webbläsare: teknikkollens gränser och scenfilernas format.
 // Körs med: node tests/unit.mjs
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from '../public/check.js';
 import { SCENES, SCENES_BY_LANG } from '../public/scenes.js';
 import { sv, en, t, TEXTS, LANGS } from '../public/texts.js';
@@ -101,7 +101,7 @@ const contentShape = (c) => JSON.stringify([
 ]);
 check(LANGS.every((l) => CONTENT[l] && contentShape(CONTENT[l]) === contentShape(CONTENT.sv)), 'Övningarna finns på alla språk, med lika många delar');
 const { lang_other_label: _otherLabel, ...englishTexts } = en; // länken till svenska är på svenska
-const allEnglish = JSON.stringify([CONTENT.en, SCENES_BY_LANG.en, englishTexts]).replace(/Övningssidan/g, '');
+const allEnglish = JSON.stringify([CONTENT.en, SCENES_BY_LANG.en, englishTexts]);
 check(!/[åäö]/i.test(allEnglish), 'Det engelska innehållet har inga svenska bokstäver kvar');
 const { STYLES_BY_LANG } = await import('../public/style.js');
 check(LANGS.every((l) => STYLES_BY_LANG[l] && STYLES_BY_LANG[l].map((x) => x.id).join() === STYLES_BY_LANG.sv.map((x) => x.id).join() && STYLES_BY_LANG[l].every((x) => x.namn && x.text && x.hur)), 'Spelstilarna har namn och texter på alla språk');
@@ -127,6 +127,15 @@ for (const language of LANGS) {
     `${path.relative(PUBLIC, manifest)} är skapad från texts.js (kör annars node tools/render-pages.mjs)`);
 }
 check(path.join(LANG_DIRS.sv, 'manifest.json') === MANIFEST, 'Den svenska appen har sitt manifest i public/');
+// Appen heter ActWith AI på alla språk. Det gamla arbetsnamnet ska inte synas någonstans.
+check(LANGS.every((l) => TEXTS[l].app_name === 'ActWith AI'), 'Appen heter ActWith AI på alla språk');
+const shownFiles = LANGS.flatMap((l) => readdirSync(LANG_DIRS[l]).filter((f) => f.endsWith('.html') || f === 'manifest.json').map((f) => path.join(LANG_DIRS[l], f)));
+const OLD_NAME = /[Öö]vningssidan/;
+const oldName = [
+  ...shownFiles.filter((f) => OLD_NAME.test(readFileSync(f, 'utf8'))).map((f) => path.relative(PUBLIC, f)),
+  ...LANGS.flatMap((l) => Object.keys(TEXTS[l]).filter((k) => OLD_NAME.test(TEXTS[l][k])).map((k) => `${l}.${k}`))
+];
+check(shownFiles.length >= 20 && oldName.length === 0, `Det gamla namnet Övningssidan finns inte kvar i texterna eller sidorna (${oldName.join(', ') || 'ingenstans'})`);
 const code = ['public/app.js', 'public/check.js', 'tools/render-pages.mjs']
   .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
 const usedKeys = new Set([

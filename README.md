@@ -1,4 +1,4 @@
-# Övningssida för skådespelare
+# ActWith AI, övningssida för skådespelare
 
 En statisk webbsida där man väljer en scen, kontrollerar ljud och ljus och spelar in sig själv. Videon stannar i mobilen och laddas aldrig upp.
 
@@ -81,4 +81,5 @@ William bestämde 18 november 2026 att appen ska finnas på alla språk, med sve
 - Sidans språk står i `<html lang>`, och `t()` i `texts.js` använder det. Scenerna (`scenes.js`), övningarna (`content.js`) och spelstilarna (`style.js`) finns på varje språk med samma id och samma uppbyggnad, och testerna kontrollerar det.
 - På engelska pratar AI-motspelaren engelska, mobilens röst är en engelsk röst i mobilen, och Stripes betalsida och kundsida är på engelska och går tillbaka till de engelska sidorna.
 - Hemskärmen har en länk till det andra språket. Formulären skickar med vilket språk sidan var på.
-- De engelska texterna är utkast, översatta från de svenska. Tungvrickarna är engelska klassiker. Appens namn är fortfarande arbetsnamnet Övningssidan på båda språken.
+- De engelska texterna är utkast, översatta från de svenska. Tungvrickarna är engelska klassiker.
+- Appen heter ActWith AI på båda språken, i rubriken, flikens namn och namnet under ikonen. Varumärke (PRV och EU) och domän är inte kollade än. Interna namn som Stripes `app: ovningssida`, AI-agenternas namn och återställningskodernas salt ändras inte, eftersom köpta Plus och sparade koder annars slutar fungera.

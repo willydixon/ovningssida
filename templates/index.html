@@ -274,6 +274,13 @@
     <h1 id="h-plus" tabindex="-1">{{plus_title}}</h1>
     <p class="notice" id="plus-message" aria-live="polite" hidden></p>
     <p class="test-badge" id="plus-test" hidden>{{plus_test}}</p>
+    <div id="plus-have" hidden>
+      <p class="lead" id="plus-minutes"></p>
+      <div class="row">
+        <button type="button" class="secondary" data-action="plus-portal">{{plus_manage}}</button>
+        <button type="button" class="ghost" data-action="to-angra">{{plus_withdraw}}</button>
+      </div>
+    </div>
     <div class="compare">
       <div class="plan">
         <h2>{{plus_free_title}}</h2>
@@ -299,13 +306,6 @@
     <div id="plus-buy">
       <button type="button" class="primary" data-action="plus-buy" id="plus-buy-btn">{{plus_buy}}</button>
       <p class="small">{{plus_buy_note}} <a href="kopvillkor.html">{{plus_terms_link}}</a></p>
-    </div>
-    <div id="plus-have" hidden>
-      <p class="lead" id="plus-minutes"></p>
-      <div class="row">
-        <button type="button" class="secondary" data-action="plus-portal">{{plus_manage}}</button>
-        <button type="button" class="ghost" data-action="to-angra">{{plus_withdraw}}</button>
-      </div>
     </div>
     <p class="notice" id="plus-unavailable" hidden>{{plus_unavailable}}</p>
   </section>

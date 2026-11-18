@@ -501,6 +501,8 @@ footer a:hover, .page a:hover { color: var(--ink); }
 }
 .plan-plus li { color: var(--ink); }
 #plus-buy .primary, #angra-send { width: 100%; }
+#angra-send { margin-bottom: 16px; }
+#plus-have .lead { margin-bottom: 0; }
 #plus-buy .small { margin-top: 10px; }
 #plus-buy .small a, .notice a { color: var(--ink); }
 .test-badge {

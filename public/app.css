@@ -131,6 +131,22 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 .appicon { border-radius: 9px; height: 34px; width: 34px; }
 .appname { color: var(--quiet); font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.lang-link {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--quiet);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 6px;
+  margin-left: auto;
+  min-height: 36px;
+  padding: 4px 12px;
+  text-decoration: none;
+}
+.lang-link .ic { height: 16px; width: 16px; }
+.lang-link:hover { color: var(--ink); }
 .greeting { font-size: 2.4rem; margin: 0; }
 .sub { color: var(--quiet); margin: 4px 0 0; }
 .kicker { align-items: center; color: var(--accent); display: flex; font-size: 12px; font-weight: 700; gap: 6px; letter-spacing: .12em; margin: 0 0 8px; text-transform: uppercase; }

@@ -7,9 +7,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="color-scheme" content="dark">
 <title>{{questions_page_title}}</title>
-<link rel="stylesheet" href="app.css">
-<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="{{@root}}app.css">
+<link rel="icon" href="{{@root}}icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="{{@root}}icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 <meta name="theme-color" content="#0d0b09">
 <meta name="apple-mobile-web-app-title" content="{{app_name}}">
@@ -21,8 +21,9 @@
 <h1>{{questions_title}}</h1>
 <p class="lead">{{questions_lead}}</p>
 <!-- Netlify Forms tar emot svaren. Sidan har inget skript. -->
-<form class="form" name="fragor" method="POST" action="/fragor-tack.html" data-netlify="true" netlify-honeypot="bot-field">
+<form class="form" name="fragor" method="POST" action="{{@base}}fragor-tack.html" data-netlify="true" netlify-honeypot="bot-field">
   <input type="hidden" name="form-name" value="fragor">
+  <input type="hidden" name="sprak" value="{{lang}}">
   <p class="honeypot" hidden><label>{{honeypot_label}} <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
   <label class="field">
     <span>{{questions_role_label}}</span>

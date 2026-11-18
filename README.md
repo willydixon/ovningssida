@@ -28,7 +28,8 @@ William valde 18 november 2026 utseendet Premiär bland tre förslag (`design/fo
 - Uppvärmningen har fyra steg utan kamera: andning med en cirkel i takt, läppar och tunga, tungvrickare och rösten i rummet.
 - Scenerna har egna SVG-bilder i `public/img/`, som `tools/render-pages.mjs` ritar från `tools/scene-art.mjs`, och en genre. Det finns fem scener (utkast): två drama, en komedi, en thriller och en romantik, och de kan väljas efter genre.
 - Ikonerna kommer från Lucide (ISC-licens) och ligger i `tools/icons/`. I mallarna skrivs de som `{{icon:namn}}`.
-- Improvisera med AI, En replik fem sätt och Monolog finns. Fler språk (svenska och engelska först, sedan spanska, tyska och franska) byggs härnäst.
+- Improvisera med AI, En replik fem sätt och Monolog finns.
+- Appen finns på svenska och engelska (se Språk nedan). Spanska, tyska och franska läggs till på samma sätt.
 - Din spelstil (`public/style.js`): under tagningen mäts rösten i mobilen var 50:e ms, styrka och tonhöjd (autokorrelation), men inte medan motspelaren eller AI:n pratar. Efter tagningen visas tempo, pauser, tonhöjd och styrka som iakttagelser utan betyg, hur mycket tagningen liknar fem påhittade spelstilar i procent, och en utmaning: spela nästa tagning som den stil som ligger längst bort. Spelstilarna är utkast, bygger bara på rösten och jämförs aldrig med riktiga skådespelare. Gränserna är startvärden som behöver provas på riktiga mobiler. Testerna finns i `tests/style.mjs` och avsnitt 12 i `tests/e2e.mjs`.
 - Mina tagningar (`public/takes.js`) sparar tagningar som användaren väljer att spara i webbläsarens databas (IndexedDB) i mobilen. Inget laddas upp. Gratis får 3 tagningar plats, Plus obegränsat. Ingen tagning tas bort utan att användaren själv bekräftar det.
 
@@ -69,4 +70,14 @@ Appen var helt gratis från 15 november 2026, enligt Williams beslut, och fick P
 
 ## Texter
 
-Alla texter som visas i appen och på sidorna i `templates/` ligger i `public/texts.js`. Efter en ändring där körs `node tools/render-pages.mjs`, som skriver om sidorna i `public/` och `public/manifest.json` från mallarna. Testerna kontrollerar att det är gjort. Informationssidorna (om, ai, integritet, villkor och kontakt) är handskrivna.
+Alla texter som visas i appen och på sidorna i `templates/` ligger i `public/texts.js`. Efter en ändring där körs `node tools/render-pages.mjs`, som skriver om sidorna i `public/` och `public/en/` och deras `manifest.json` från mallarna. Testerna kontrollerar att det är gjort. Informationssidorna (om, ai, integritet, villkor, kopvillkor och kontakt) är handskrivna, en gång per språk.
+
+## Språk
+
+William bestämde 18 november 2026 att appen ska finnas på alla språk, med svenska och engelska först och sedan spanska, tyska och franska.
+
+- De svenska sidorna ligger i `public/` och de engelska i `public/en/`. Skript, stil, ikoner, typsnitt och bilder är gemensamma och ligger i `public/`. I mallarna skrivs vägen till dem som `{{@root}}`, sidans mapp som `{{@base}}` och sidan på det andra språket som `{{@other}}`.
+- Sidans språk står i `<html lang>`, och `t()` i `texts.js` använder det. Scenerna (`scenes.js`), övningarna (`content.js`) och spelstilarna (`style.js`) finns på varje språk med samma id och samma uppbyggnad, och testerna kontrollerar det.
+- På engelska pratar AI-motspelaren engelska, mobilens röst är en engelsk röst i mobilen, och Stripes betalsida och kundsida är på engelska och går tillbaka till de engelska sidorna.
+- Hemskärmen har en länk till det andra språket. Formulären skickar med vilket språk sidan var på.
+- De engelska texterna är utkast, översatta från de svenska. Tungvrickarna är engelska klassiker. Appens namn är fortfarande arbetsnamnet Övningssidan på båda språken.

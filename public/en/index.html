@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="color-scheme" content="dark">
+<title>Övningssidan, test version</title>
+<link rel="stylesheet" href="../app.css">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+<meta name="theme-color" content="#0d0b09">
+<meta name="apple-mobile-web-app-title" content="Övningssidan">
+<script type="module" src="../app.js"></script>
+</head>
+<body>
+<div class="testband">Test version. The scenes are drafts and have not been reviewed yet.</div>
+
+<main id="app">
+
+  <!-- 1. Hem -->
+  <section data-screen="start" class="home" aria-labelledby="h-start">
+    <div class="topbar">
+      <img src="../icons/icon-192.png" alt="" class="appicon" width="34" height="34">
+      <span class="appname">Övningssidan</span>
+      <a class="lang-link" href="../" hreflang="sv" lang="sv" aria-label="Läs på svenska"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-globe" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /> </svg>Svenska</a>
+    </div>
+    <h1 id="h-start" tabindex="-1" class="greeting">Hi.</h1>
+    <p class="sub">Ready for a take?</p>
+    <article class="hero" aria-labelledby="h-daily">
+      <p class="kicker" id="h-daily"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-flame" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /> </svg>Today’s challenge</p>
+      <p class="hero-text" id="daily-text"></p>
+      <div class="hero-row">
+        <button type="button" class="primary" data-action="daily">Take the challenge</button>
+        <span class="meta"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-timer" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <line x1="10" x2="14" y1="2" y2="2" /> <line x1="12" x2="15" y1="14" y2="11" /> <circle cx="12" cy="14" r="8" /> </svg>2 min</span>
+      </div>
+    </article>
+    <div class="tiles">
+      <button type="button" class="tile" data-action="play-scenes"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-clapperboard" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m12.296 3.464 3.02 3.956" /> <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> <path d="m6.18 5.276 3.1 3.899" /> </svg><strong>Play a scene</strong><span>Script and AI scene partner</span></button>
+      <button type="button" class="tile" data-action="improv"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-messages-square" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /> <path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1" /> </svg><strong>Improvise with AI</strong><span>No script. Just you and a character.</span></button>
+      <button type="button" class="tile" data-action="fiveways"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-drama" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10 11h.01" /> <path d="M14 6h.01" /> <path d="M18 6h.01" /> <path d="M6.5 13.1h.01" /> <path d="M22 5c0 9-4 12-6 12s-6-3-6-12c0-2 2-3 6-3s6 1 6 3" /> <path d="M17.4 9.9c-.8.8-2 .8-2.8 0" /> <path d="M10.1 7.1C9 7.2 7.7 7.7 6 8.6c-3.5 2-4.7 3.9-3.7 5.6 4.5 7.8 9.5 8.4 11.2 7.4.9-.5 1.9-2.1 1.9-4.7" /> <path d="M9.1 16.5c.3-1.1 1.4-1.7 2.4-1.4" /> </svg><strong>One line, five ways</strong><span>Ironic, angry, in love …</span></button>
+      <button type="button" class="tile" data-action="warmup"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-audio-lines" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2 10v3" /> <path d="M6 6v11" /> <path d="M10 3v18" /> <path d="M14 8v7" /> <path d="M18 5v13" /> <path d="M22 10v3" /> </svg><strong>Warm-up</strong><span>Voice, breath and diction</span></button>
+      <button type="button" class="tile" data-action="monologue"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-lamp-desk" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M10.293 2.293a1 1 0 0 1 1.414 0l2.5 2.5 5.994 1.227a1 1 0 0 1 .506 1.687l-7 7a1 1 0 0 1-1.687-.506l-1.227-5.994-2.5-2.5a1 1 0 0 1 0-1.414z" /> <path d="m14.207 4.793-3.414 3.414" /> <path d="M3 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" /> <path d="m9.086 6.5-4.793 4.793a1 1 0 0 0-.18 1.17L7 18" /> </svg><strong>Monologue</strong><span>Your moment in the spotlight</span></button>
+      <button type="button" class="tile" data-action="takes"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-film" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M7 3v18" /> <path d="M3 7.5h4" /> <path d="M3 12h18" /> <path d="M3 16.5h4" /> <path d="M17 3v18" /> <path d="M17 7.5h4" /> <path d="M17 16.5h4" /> </svg><strong>My takes</strong><span>See how you develop</span></button>
+    </div>
+    <button type="button" class="plus-banner" data-action="to-plus" id="plus-banner">
+      <svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg><span><strong id="plus-banner-title">Plus</strong> <span id="plus-banner-text">60 AI minutes a month, a more lifelike AI voice and longer takes.</span></span>
+    </button>
+    <div class="notice" id="inapp-notice" hidden>
+      <p><strong>Please open the page in Safari or Chrome.</strong> You seem to have opened the link inside an app, and the camera does not always work there.</p>
+      <p>Tap the menu with three dots in the app and choose to open it in your browser, or copy the link.</p>
+      <button type="button" class="secondary" data-action="copy-link">Copy the link</button>
+      <p class="small" data-copy-status aria-live="polite"></p>
+    </div>
+    <ul class="promises">
+      <li><strong>Practice, no grades.</strong> The app does not judge your acting or your looks.</li>
+      <li><strong>The video stays on your phone.</strong> It is never sent to us.</li>
+      <li><strong>Free and without an account.</strong> This is a test version.</li>
+    </ul>
+  </section>
+
+  <!-- Uppvärmning, utan kamera -->
+  <section data-screen="warmup" aria-labelledby="h-warmup" hidden>
+    <p class="kicker"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-audio-lines" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M2 10v3" /> <path d="M6 6v11" /> <path d="M10 3v18" /> <path d="M14 8v7" /> <path d="M18 5v13" /> <path d="M22 10v3" /> </svg><span id="warmup-step"></span></p>
+    <h1 id="h-warmup" tabindex="-1"></h1>
+    <p class="lead" id="warmup-text"></p>
+    <div class="breath" id="breath" hidden>
+      <div class="breath-circle" id="breath-circle"></div>
+      <p class="breath-label" id="breath-label" aria-live="polite"></p>
+    </div>
+    <div class="twister" id="twister" hidden>
+      <p class="twister-text" id="twister-text"></p>
+      <button type="button" class="ghost" data-action="next-twister">Another tongue twister</button>
+    </div>
+    <p class="timer" id="warmup-timer" aria-live="polite" hidden></p>
+    <div class="row">
+      <button type="button" class="secondary" data-action="warmup-start" id="warmup-start">Start the clock</button>
+      <button type="button" class="primary" data-action="warmup-next" id="warmup-next">Next</button>
+    </div>
+  </section>
+
+  <!-- Välj monolog eller situation att improvisera -->
+  <section data-screen="pick" aria-labelledby="h-pick" hidden>
+    <h1 id="h-pick" tabindex="-1"></h1>
+    <p id="pick-text"></p>
+    <p class="notice" id="pick-notice" hidden></p>
+    <div id="pick-list" class="scene-list"></div>
+    <button type="button" class="ghost" data-action="to-start">Back to home</button>
+  </section>
+
+  <section data-screen="warmup-done" aria-labelledby="h-warmup-done" hidden>
+    <h1 id="h-warmup-done" tabindex="-1">Now you are warm</h1>
+    <p class="lead">Your voice, breath and mouth are going. Make the most of it while it lasts.</p>
+    <div class="row">
+      <button type="button" class="primary" data-action="play-scenes">Play a scene</button>
+      <button type="button" class="secondary" data-action="daily">Today’s challenge</button>
+    </div>
+  </section>
+
+  <!-- 2. Bekräfta 18 år -->
+  <section data-screen="age" aria-labelledby="h-age" hidden>
+    <h1 id="h-age" tabindex="-1">This service is for adults</h1>
+    <p>You need to be 18 or older to use the camera here. Your answer is not saved, so the question comes back next time.</p>
+    <label class="check">
+      <input type="checkbox" id="age-ok">
+      <span>I am 18 or older</span>
+    </label>
+    <div class="row">
+      <button type="button" class="ghost" data-action="to-start">Back</button>
+      <button type="button" class="primary" data-action="age-continue" id="age-continue" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- 3. Välj scen och roll -->
+  <section data-screen="scenes" aria-labelledby="h-scenes" hidden>
+    <h1 id="h-scenes" tabindex="-1">Choose a scene</h1>
+    <p>All scenes are for two people. Choose a scene and the role you want to play.</p>
+    <div class="chips" id="genre-chips" role="group" aria-label="Choose a genre"></div>
+    <div id="scene-list" class="scene-list"></div>
+    <div id="role-pick" hidden>
+      <h2 id="h-role" tabindex="-1">Which role do you want to play?</h2>
+      <p id="role-situation" class="situation"></p>
+      <div id="role-buttons" class="row"></div>
+      <button type="button" class="ghost" data-action="pick-other-scene">Choose another scene</button>
+    </div>
+  </section>
+
+  <!-- 4. Teknikkoll -->
+  <section data-screen="check" aria-labelledby="h-check" hidden>
+    <h1 id="h-check" tabindex="-1">Tech check</h1>
+    <p>Place your phone so that your face and shoulders are inside the frame. The check only measures sound, light and framing.</p>
+    <div class="camera">
+      <video id="preview-check" class="mirror" autoplay muted playsinline></video>
+      <div class="frame" aria-hidden="true"></div>
+    </div>
+    <div class="meter" aria-hidden="true"><div class="meter-fill" id="meter-fill"></div></div>
+    <p class="prompt" id="check-prompt" aria-live="polite">Tap Start the check. First stay quiet for two seconds, then say your first line in your normal voice.</p>
+    <ul class="results" id="check-results" hidden></ul>
+    <div class="row">
+      <button type="button" class="secondary" data-action="run-check" id="run-check">Start the check</button>
+      <button type="button" class="primary" data-action="to-record">To the recording</button>
+    </div>
+    <p class="small">The preview is mirrored, like a mirror. The saved video is the right way round.</p>
+  </section>
+
+  <!-- 5. Spela in -->
+  <section data-screen="record" aria-labelledby="h-record" hidden>
+    <h1 id="h-record" tabindex="-1">Record</h1>
+    <div class="camera small">
+      <video id="preview-record" class="mirror" autoplay muted playsinline></video>
+      <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
+      <div class="rec" id="rec-badge" hidden><span class="dot"></span><span id="rec-time">0:00</span> / <span id="rec-max">3:00</span></div>
+    </div>
+    <fieldset id="partner-box" class="partner">
+      <legend>Scene partner</legend>
+      <label class="check" id="mode-ai-row" hidden>
+        <input type="radio" name="partner" value="ai" id="mode-ai" checked>
+        <span>AI that answers you (test) <small class="ai-minutes" id="ai-minutes"></small></span>
+      </label>
+      <label class="check" id="partner-toggle">
+        <input type="radio" name="partner" value="voice" id="partner-on">
+        <span>The phone reads your partner’s lines aloud</span>
+      </label>
+      <label class="check">
+        <input type="radio" name="partner" value="none" id="mode-none">
+        <span>No voice, I read myself</span>
+      </label>
+      <p class="small" id="partner-note">The voice is the phone’s built-in text-to-speech voice and may be heard in the recording, like a partner behind the camera. The next line comes when you have said yours, or when you tap Next line.</p>
+      <p class="small" id="partner-no-voice" hidden>Your phone has no English text-to-speech voice that the page can use, so your partner’s lines are only shown as text.</p>
+    </fieldset>
+    <p class="small" id="ai-note" hidden>You are talking to an AI, not a human. The AI plays your scene partner and answers what you say, so you can follow the script or improvise. During the scene, the sound from the microphone is sent to ElevenLabs. The video stays on your phone.</p>
+    <div class="notice" id="ai-paywall" hidden>
+      <p id="ai-paywall-text"></p>
+      <button type="button" class="primary" data-action="to-plus">Read about Plus</button>
+    </div>
+    <div class="controls">
+      <div class="row">
+        <button type="button" class="primary" data-action="start-rec" id="start-rec">Start recording</button>
+        <button type="button" class="secondary" data-action="next-line" id="next-line" hidden>Next line</button>
+        <button type="button" class="danger" data-action="stop-rec" id="stop-rec" hidden>Stop</button>
+      </div>
+      <p class="prompt" id="partner-done" aria-live="polite" hidden>The scene is over. Tap Stop when you are done.</p>
+      <p class="prompt" id="ai-status" aria-live="polite" hidden></p>
+    </div>
+    <div class="script ai-log" id="ai-log" aria-label="The conversation with the AI scene partner" hidden></div>
+    <div class="script" id="script" aria-label="The lines of the scene"></div>
+    <p class="small" id="record-max-note"></p>
+  </section>
+
+  <!-- 6. Titta -->
+  <section data-screen="review" aria-labelledby="h-review" hidden>
+    <h1 id="h-review" tabindex="-1">Watch the take</h1>
+    <p class="notice" id="review-note" hidden></p>
+    <video id="playback" controls playsinline></video>
+    <p class="small" id="playback-error" hidden>Playback does not work in this browser, but you can still save the video.</p>
+    <div class="row">
+      <button type="button" class="ghost" data-action="retake">Retake</button>
+      <button type="button" class="primary" data-action="to-save">Save</button>
+    </div>
+    <section class="style-card" id="style-review" aria-label="Your acting style" hidden></section>
+  </section>
+
+  <!-- 7. Spara i Mina tagningar eller i mobilen -->
+  <section data-screen="save" aria-labelledby="h-save" hidden>
+    <h1 id="h-save" tabindex="-1">Save the take</h1>
+    <p>The take only exists here until you save it. Save it in My takes to watch it again in the app, or on your phone to have it among your photos.</p>
+    <button type="button" class="primary wide" data-action="save-take" id="save-take-btn"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-film" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M7 3v18" /> <path d="M3 7.5h4" /> <path d="M3 12h18" /> <path d="M3 16.5h4" /> <path d="M17 3v18" /> <path d="M17 7.5h4" /> <path d="M17 16.5h4" /> </svg>Save in My takes</button>
+    <div class="notice" id="save-take-status" hidden>
+      <p id="save-take-text" aria-live="polite"></p>
+      <div class="row">
+        <button type="button" class="secondary" data-action="takes" id="save-take-open">Show My takes</button>
+        <button type="button" class="primary" data-action="to-plus" id="save-take-plus" hidden>Read about Plus</button>
+      </div>
+    </div>
+    <h2>Save on your phone</h2>
+    <button type="button" class="secondary" data-action="share" id="share-btn" hidden>Save or share</button>
+    <a class="button secondary" id="download-link" href="#" download>Download the video</a>
+    <p class="small" id="save-status" aria-live="polite"></p>
+    <ul class="tips">
+      <li><strong>iPhone:</strong> tap Save or share and choose Save Video, and it ends up in Photos. A download ends up in the Files app instead.</li>
+      <li><strong>Android:</strong> a download ends up in the Downloads folder and usually shows up in Gallery or Google Photos.</li>
+    </ul>
+    <div class="row">
+      <button type="button" class="ghost" data-action="retake">New take</button>
+      <button type="button" class="ghost" data-action="to-scenes">Choose another scene</button>
+    </div>
+  </section>
+
+  <!-- Mina tagningar -->
+  <section data-screen="takes" aria-labelledby="h-takes" hidden>
+    <h1 id="h-takes" tabindex="-1">My takes</h1>
+    <p class="small" id="takes-count"></p>
+    <p class="notice" id="takes-message" aria-live="polite" hidden></p>
+    <div class="notice" id="takes-unsaved" hidden>
+      <p>You have a take that is not saved yet.</p>
+      <button type="button" class="primary" data-action="to-save">Back to the take</button>
+    </div>
+    <div id="takes-list" class="take-list"></div>
+    <div id="takes-empty" hidden>
+      <p class="lead">No saved takes yet. Record something and tap Save in My takes.</p>
+      <button type="button" class="primary" data-action="play-scenes">Record a scene</button>
+    </div>
+    <p class="small">Your takes are only saved in the browser on this phone and are never sent to us. If you clear the browser they disappear, so save important takes on your phone too.</p>
+    <template id="tpl-play"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-play" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /> </svg></template>
+  </section>
+
+  <!-- En tagning i Mina tagningar -->
+  <section data-screen="take" aria-labelledby="h-take" hidden>
+    <p class="kicker"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-film" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M7 3v18" /> <path d="M3 7.5h4" /> <path d="M3 12h18" /> <path d="M3 16.5h4" /> <path d="M17 3v18" /> <path d="M17 7.5h4" /> <path d="M17 16.5h4" /> </svg>My takes</p>
+    <h1 id="h-take" tabindex="-1"></h1>
+    <p class="small" id="take-meta"></p>
+    <video id="take-video" controls playsinline></video>
+    <p class="small" id="take-error" hidden>Playback does not work in this browser, but you can still save the video.</p>
+    <div class="row">
+      <button type="button" class="secondary" data-action="take-share" id="take-share" hidden>Save or share</button>
+      <a class="button secondary" id="take-download" href="#" download>Download the video</a>
+    </div>
+    <p class="small" id="take-status" aria-live="polite"></p>
+    <section class="style-card" id="style-take" aria-label="Your acting style" hidden></section>
+    <div class="row">
+      <button type="button" class="ghost" data-action="takes">Back to My takes</button>
+      <button type="button" class="ghost" data-action="take-delete" id="take-delete">{{icon:trash-2}}Delete</button>
+    </div>
+    <div class="notice" id="take-confirm" hidden>
+      <p>Do you want to delete the take? This cannot be undone.</p>
+      <div class="row">
+        <button type="button" class="ghost" data-action="take-delete-no">Cancel</button>
+        <button type="button" class="danger" data-action="take-delete-yes" id="take-delete-yes">Yes, delete</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Plus -->
+  <section data-screen="plus" aria-labelledby="h-plus" hidden>
+    <p class="kicker"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg>Plus</p>
+    <h1 id="h-plus" tabindex="-1">More AI and more time</h1>
+    <p class="notice" id="plus-message" aria-live="polite" hidden></p>
+    <p class="test-badge" id="plus-test" hidden>Test mode: no real money is charged. Pay with the test card 4242 4242 4242 4242, any future date and any code.</p>
+    <div id="plus-have" hidden>
+      <p class="lead" id="plus-minutes"></p>
+      <div class="row">
+        <button type="button" class="secondary" data-action="plus-portal">Change card or cancel</button>
+        <button type="button" class="ghost" data-action="to-angra">Withdraw from purchase</button>
+      </div>
+    </div>
+    <div class="compare">
+      <div class="plan">
+        <h2>Free</h2>
+        <p class="price">0 SEK</p>
+        <ul>
+          <li>All exercises and scenes</li>
+          <li>The phone’s voice as scene partner and 5 AI minutes to try</li>
+          <li>Takes up to 3 minutes</li>
+          <li>Room for 3 takes in My takes</li>
+        </ul>
+      </div>
+      <div class="plan plan-plus">
+        <h2>Plus</h2>
+        <p class="price">99 SEK a month</p>
+        <ul>
+          <li>60 AI minutes a month</li>
+          <li>A more lifelike AI voice</li>
+          <li>Takes up to 10 minutes</li>
+          <li>Unlimited My takes</li>
+        </ul>
+      </div>
+    </div>
+    <div id="plus-buy">
+      <button type="button" class="primary" data-action="plus-buy" id="plus-buy-btn">Get Plus for 99 SEK a month</button>
+      <p class="small">The price includes VAT. No commitment, and you can cancel whenever you like. You have a 14-day right of withdrawal. Payments are handled by Stripe. <a href="kopvillkor.html">Terms of purchase</a></p>
+    </div>
+    <p class="notice" id="plus-unavailable" hidden>Purchases are not open yet. Plus is coming soon.</p>
+  </section>
+
+  <!-- Ångerknappen -->
+  <section data-screen="angra" aria-labelledby="h-angra" hidden>
+    <h1 id="h-angra" tabindex="-1">Withdraw from your purchase</h1>
+    <p>Within 14 days of buying Plus you can withdraw and get the full amount back. After 14 days, Plus is cancelled instead at the end of the month you have paid for.</p>
+    <div id="angra-form">
+      <label class="field"><span>Your name</span><input id="angra-name" autocomplete="name" maxlength="100"></label>
+      <p class="small" id="angra-contract"></p>
+      <label class="check"><input type="checkbox" id="angra-ok"><span>I want to withdraw from my purchase of Plus.</span></label>
+      <button type="button" class="danger" data-action="angra-send" id="angra-send" disabled>Withdraw from purchase</button>
+    </div>
+    <p class="notice" id="angra-result" aria-live="polite" hidden></p>
+    <p class="notice" id="angra-none" hidden>This phone has no purchase of Plus. If you bought it on another phone, open the app there or get in touch via Contact.</p>
+    <button type="button" class="ghost" data-action="to-start">Back to home</button>
+  </section>
+
+  <!-- Hjälp vid fel -->
+  <section data-screen="help" aria-labelledby="h-help" hidden>
+    <h1 id="h-help" tabindex="-1">The camera could not start</h1>
+    <div id="help-text"></div>
+    <div class="row">
+      <button type="button" class="ghost" data-action="to-start">To the home page</button>
+      <button type="button" class="primary" data-action="retry-camera">Try again</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar" id="tabbar" aria-label="Main menu">
+  <button type="button" data-action="to-start" data-tab="start"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-house" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </svg><span>Home</span></button>
+  <button type="button" data-action="play-scenes" data-tab="scenes"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-clapperboard" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="m12.296 3.464 3.02 3.956" /> <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> <path d="m6.18 5.276 3.1 3.899" /> </svg><span>Scenes</span></button>
+  <button type="button" data-action="warmup" data-tab="warmup"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg><span>Train</span></button>
+</nav>
+
+<footer>
+  <nav aria-label="About the site">
+    <a href="anmalan.html">Sign up</a>
+    <a href="om.html">About</a>
+    <a href="ai.html">How AI is used</a>
+    <a href="integritet.html">Privacy</a>
+    <a href="villkor.html">Terms</a>
+    <a href="kontakt.html">Contact</a>
+    <a href="?angra=1">Withdraw from purchase</a>
+  </nav>
+</footer>
+</body>
+</html>

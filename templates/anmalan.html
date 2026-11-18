@@ -7,13 +7,13 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="color-scheme" content="dark">
 <title>{{signup_page_title}}</title>
-<link rel="stylesheet" href="app.css">
-<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="{{@root}}app.css">
+<link rel="icon" href="{{@root}}icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="{{@root}}icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 <meta name="theme-color" content="#0d0b09">
 <meta name="apple-mobile-web-app-title" content="{{app_name}}">
-<script type="module" src="anmalan.js"></script>
+<script type="module" src="{{@root}}anmalan.js"></script>
 </head>
 <body>
 <div class="testband">{{test_band_pages}}</div>
@@ -22,8 +22,9 @@
 <h1>{{signup_title}}</h1>
 <p class="lead">{{signup_lead}}</p>
 <!-- Netlify Forms tar emot anmälan. Inget skript skickar något: formuläret skickas som en vanlig sida. -->
-<form class="form" name="anmalan" method="POST" action="/tack.html" data-netlify="true" netlify-honeypot="bot-field">
+<form class="form" name="anmalan" method="POST" action="{{@base}}tack.html" data-netlify="true" netlify-honeypot="bot-field">
   <input type="hidden" name="form-name" value="anmalan">
+  <input type="hidden" name="sprak" value="{{lang}}">
   <input type="hidden" name="fran" id="fran" value="">
   <p class="honeypot" hidden><label>{{honeypot_label}} <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
   <label class="field">

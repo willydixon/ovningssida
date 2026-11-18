@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
+<meta name="color-scheme" content="dark">
+<title>Questions for actors, Övningssidan</title>
+<link rel="stylesheet" href="../app.css">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json" crossorigin="use-credentials">
+<meta name="theme-color" content="#0d0b09">
+<meta name="apple-mobile-web-app-title" content="Övningssidan">
+</head>
+<body>
+<div class="testband">Test version. The texts are drafts.</div>
+<main class="page">
+<a class="back" href="index.html">← Back to practice</a>
+<h1>Questions for actors and teachers</h1>
+<p class="lead">Help us build the right thing. Answer what you like. The answers are read by a human and are only used to develop Övningssidan.</p>
+<!-- Netlify Forms tar emot svaren. Sidan har inget skript. -->
+<form class="form" name="fragor" method="POST" action="/en/fragor-tack.html" data-netlify="true" netlify-honeypot="bot-field">
+  <input type="hidden" name="form-name" value="fragor">
+  <input type="hidden" name="sprak" value="en">
+  <p class="honeypot" hidden><label>Leave this field empty <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+  <label class="field">
+    <span>I am</span>
+    <select name="roll">
+      <option value="skadespelare">An actor</option>
+      <option value="larare">A teacher or course leader</option>
+      <option value="annat">Other</option>
+    </select>
+  </label>
+  <label class="field"><span>When did you last make a self-tape, and how did it go?</span><textarea name="fraga1" rows="3"></textarea></label>
+  <label class="field"><span>Where did you find text to practise with?</span><textarea name="fraga2" rows="3"></textarea></label>
+  <label class="field"><span>What is hardest when you practise alone?</span><textarea name="fraga3" rows="3"></textarea></label>
+  <label class="field"><span>Would it help you to practise with an AI that plays your scene partner and answers you?</span><textarea name="fraga4" rows="3"></textarea></label>
+  <label class="field"><span>What kind of feedback after a take would help you most?</span><textarea name="fraga5" rows="3"></textarea></label>
+  <label class="check">
+    <input type="checkbox" name="nyheter" value="ja">
+    <span>Yes, you may email me when there is something new to test</span>
+  </label>
+  <label class="field">
+    <span>Your email, if you want an email</span>
+    <input type="email" name="epost" autocomplete="email">
+  </label>
+  <label class="check">
+    <input type="checkbox" name="vuxen" value="ja" required>
+    <span>I am 18 or older</span>
+  </label>
+  <label class="check">
+    <input type="checkbox" name="samtycke" value="ja" required>
+    <span>Yes, you may save my answers for at most 12 months.</span>
+  </label>
+  <p class="small"><a href="integritet.html">How we handle your data</a></p>
+  <button type="submit" class="primary">Send the answers</button>
+</form>
+</main>
+<footer>
+  <nav aria-label="About the site">
+    <a href="anmalan.html">Sign up</a>
+    <a href="om.html">About</a>
+    <a href="ai.html">How AI is used</a>
+    <a href="integritet.html">Privacy</a>
+    <a href="villkor.html">Terms</a>
+    <a href="kontakt.html">Contact</a>
+    <a href="index.html?angra=1">Withdraw from purchase</a>
+  </nav>
+</footer>
+</body>
+</html>

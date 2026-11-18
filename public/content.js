@@ -1,8 +1,11 @@
-// Innehåll till dagens utmaning och uppvärmningen. Allt är utkast som William godkänner.
-// Texterna till knappar och rubriker ligger i texts.js.
+// Innehåll till dagens utmaning, uppvärmningen och övningarna. Allt är utkast som William godkänner.
+// Texterna till knappar och rubriker ligger i texts.js. Varje språk har sitt eget innehåll
+// (SV och EN nedan), och sidans språk avgör vilket som används.
+
+import { lang } from './texts.js';
 
 // En utmaning per dag. Samma dag ger samma utmaning för alla.
-export const CHALLENGES = [
+const SV_CHALLENGES = [
   'Säg ”Jag har aldrig varit här förut” så att vi tror dig. Sedan så att vi inte gör det.',
   'Berätta vad du åt till frukost som om det var den bästa nyheten i ditt liv.',
   'Säg ”Det gör inget” tre gånger: när det inte gör något, när det gör ont och när du är arg.',
@@ -27,7 +30,7 @@ export function challengeFor(date = new Date()) {
 }
 
 // Uppvärmningen: fyra korta steg utan kamera. sekunder ger en klocka att följa.
-export const WARMUP = [
+const SV_WARMUP = [
   {
     id: 'andas',
     titel: 'Andas',
@@ -63,7 +66,7 @@ export const WARMUP = [
 
 // ---- En replik, fem sätt ----
 // Samma replik fem gånger, på ett nytt sätt varje gång. Repliken och sätten slumpas.
-export const FIVEWAYS_LINES = [
+const SV_FIVEWAYS_LINES = [
   'Jag visste att du skulle säga det.',
   'Var har du varit?',
   'Vi måste prata.',
@@ -74,7 +77,7 @@ export const FIVEWAYS_LINES = [
   'Jag har väntat på dig.'
 ];
 
-export const FIVEWAYS_WAYS = [
+const SV_FIVEWAYS_WAYS = [
   'Ironiskt', 'Argt', 'Förälskat', 'Rädd', 'Lycklig', 'Misstänksamt', 'Trött',
   'Avundsjukt', 'Som en hemlighet', 'Som en order', 'Sårat', 'Uttråkat', 'Förväntansfullt'
 ];
@@ -103,7 +106,7 @@ export function fiveWaysScene(texts, random = Math.random) {
 // ---- Monologer ----
 // Varje monolog är delad i stycken. Den som spelar gör en kort paus mellan styckena,
 // och då markeras nästa stycke. Alla är utkast.
-export const MONOLOGUES = [
+const SV_MONOLOGUES = [
   {
     id: 'mon-brevet',
     titel: 'Brevet',
@@ -159,7 +162,7 @@ export function monologueScene(m, texts) {
 
 // ---- Improvisera med AI ----
 // Ingen text. AI-motspelaren spelar karaktären och börjar med repliken forsta.
-export const IMPROVS = [
+const SV_IMPROVS = [
   {
     id: 'imp-grannen',
     titel: 'Grannen',
@@ -216,3 +219,170 @@ export function improvScene(s, texts) {
     repliker: []
   };
 }
+
+// ---- Engelska ----
+// Samma innehåll på engelska. Tungvrickarna är engelska klassiker, eftersom svenska inte går att översätta.
+const EN_CHALLENGES = [
+  'Say “I have never been here before” so that we believe you. Then so that we don’t.',
+  'Tell us what you had for breakfast as if it were the best news of your life.',
+  'Say “It doesn’t matter” three times: when it doesn’t matter, when it hurts and when you are angry.',
+  'Ask someone for forgiveness without using the word sorry.',
+  'Make up tomorrow’s weather forecast and read it as if you were having an argument.',
+  'Say your own name as at a party, as in an interview with the police and as on a big stage.',
+  'Stay silent for ten seconds and let the camera see that you are thinking of something you don’t want to say.',
+  'Say “Have you eaten?” as a worried parent, as a stressed boss and as someone in love.',
+  'Tell us about a memory from school, but let us understand more than you say.',
+  'Say “This is not my fault” and make us doubt you.',
+  'Read the ingredients of something in the kitchen as if they were a secret.',
+  'Say “Congratulations” so that we hear that you are actually jealous.',
+  'Get someone to give you the last piece of cake, without asking for it.',
+  'Say “See you tomorrow” as if you know that you won’t.'
+];
+
+const EN_WARMUP = [
+  {
+    id: 'andas',
+    titel: 'Breathe',
+    text: 'Breathe in for four seconds, hold your breath for four and breathe out for six. Do it three times.',
+    sekunder: 42,
+    andning: [['in', 4], ['hall', 4], ['ut', 6]]
+  },
+  {
+    id: 'lappar',
+    titel: 'Lips and tongue',
+    text: 'Let your lips flutter like a motorboat, brrr, for ten seconds. Then roll your tongue around your teeth, ten times in each direction.',
+    sekunder: 40
+  },
+  {
+    id: 'tungvrickare',
+    titel: 'Tongue twisters',
+    text: 'Say it three times, a little faster each time. Clear comes before fast.',
+    lista: [
+      'Red lorry, yellow lorry.',
+      'She sells seashells by the seashore.',
+      'Unique New York, you know you need unique New York.',
+      'Peter Piper picked a peck of pickled peppers.',
+      'Six slick slim sycamore saplings.'
+    ]
+  },
+  {
+    id: 'rosten',
+    titel: 'The voice in the room',
+    text: 'Say “Hi, how are you?” first in a whisper, then to someone next to you and last to someone across the street. Let your voice carry without shouting.',
+    sekunder: 30
+  }
+];
+
+const EN_FIVEWAYS_LINES = [
+  'I knew you would say that.',
+  'Where have you been?',
+  'We need to talk.',
+  'You came.',
+  'It’s okay.',
+  'Shall we go?',
+  'This is the best thing that has ever happened to me.',
+  'I have been waiting for you.'
+];
+
+const EN_FIVEWAYS_WAYS = [
+  'Ironically', 'Angrily', 'In love', 'Scared', 'Happily', 'Suspiciously', 'Tired',
+  'Jealously', 'As a secret', 'As an order', 'Hurt', 'Bored', 'Expectantly'
+];
+
+const EN_MONOLOGUES = [
+  {
+    id: 'mon-brevet',
+    titel: 'The Letter',
+    genre: 'Drama',
+    langd_sekunder: 75,
+    text: 'A letter to a father who is no longer here.',
+    stycken: [
+      'Dad. I have written this letter four times now. The first time I was angry. The second time I was sad. The third time I only wrote about the weather, like we always did.',
+      'Now I don’t know what I am. I only know that I miss hearing you complain about my shoes.',
+      'You always said I would become something big. I didn’t. I became me. And I think that would have been enough for you, if I had asked.',
+      'So now I’m asking. Is it enough?'
+    ]
+  },
+  {
+    id: 'mon-uppkorningen',
+    titel: 'The Driving Test',
+    genre: 'Comedy',
+    langd_sekunder: 70,
+    text: 'The fourth driving test. It did not go well. The examiner has the pen in hand.',
+    stycken: [
+      'No, no, wait. Before you write anything. I know I drove through a red light. But it was amber when I made up my mind.',
+      'And the roundabout, yes, I went round three times. But that was to show that I can turn. Both ways, if needed.',
+      'This is the fourth time. My mum has bought a cake. It says “Congratulations on your licence” on it. With marzipan.',
+      'So here is my suggestion: you give me the licence, and I promise never to drive. Never. I’ll just keep it in my wallet and feel like a grown-up.'
+    ]
+  },
+  {
+    id: 'mon-nattskiftet',
+    titel: 'The Night Shift',
+    genre: 'Drama',
+    langd_sekunder: 75,
+    text: 'A nurse talks to a patient who is asleep.',
+    stycken: [
+      'It’s three o’clock. This is when it’s at its quietest here. Just you, me and the machine that beeps when you dream.',
+      'I don’t know if you can hear me. The doctor says you can’t. But the doctor goes home at five.',
+      'Your daughter called again tonight. She asked if you had eaten. I said yes. It wasn’t true, but it was kind.',
+      'So you have to wake up now. Not for my sake. Because someone has to tell her that I lied.'
+    ]
+  }
+];
+
+const EN_IMPROVS = [
+  {
+    id: 'imp-grannen',
+    titel: 'The Neighbour',
+    genre: 'Comedy',
+    situation: 'It is seven in the morning. You ring your neighbour’s doorbell to complain about last night’s noise. The neighbour opens the door.',
+    du: { vill: 'Get the neighbour to promise that it will be quiet tonight.' },
+    ai: { namn: 'The Neighbour', vill: 'Get rid of you as fast as possible, without admitting anything.', inre: 'Had a party last night and has a headache. Thinks you are a bit boring.', forsta: 'Yes? Do you know what time it is?' }
+  },
+  {
+    id: 'imp-hissen',
+    titel: 'The Lift',
+    genre: 'Drama',
+    situation: 'The lift is stuck between two floors. You and a stranger are waiting for help.',
+    du: { vill: 'Stay calm and get the stranger to talk.' },
+    ai: { namn: 'The Stranger', vill: 'Get out before an important meeting in twenty minutes.', inre: 'Is afraid of small spaces, but ashamed of it.', forsta: 'This isn’t happening. Not today.' }
+  },
+  {
+    id: 'imp-bestallningen',
+    titel: 'Wrong Order',
+    genre: 'Comedy',
+    situation: 'You have been given the wrong food for the second time at the same restaurant. The waiter comes back to the table.',
+    du: { vill: 'Get the right food, without becoming the difficult guest.' },
+    ai: { namn: 'The Waiter', vill: 'Get you to eat what you have been given.', inre: 'Is new at the job and has already had one warning tonight.', forsta: 'Was everything to your satisfaction?' }
+  },
+  {
+    id: 'imp-dejten',
+    titel: 'First Date',
+    genre: 'Romance',
+    situation: 'You are meeting for the first time after chatting in an app. Neither of you looks quite like the pictures.',
+    du: { vill: 'Find out if this is worth a second date.' },
+    ai: { namn: 'The Date', vill: 'Make a good impression.', inre: 'Lied about their job in the app and does not know how it will come out.', forsta: 'Hi! I… do you recognise me?' }
+  },
+  {
+    id: 'imp-motet',
+    titel: 'Meeting the Boss',
+    genre: 'Thriller',
+    situation: 'A colleague claims that you have taken money from the till. The boss has called you in to a meeting.',
+    du: { vill: 'Show that you are innocent.' },
+    ai: { namn: 'The Boss', vill: 'Get a confession before the end of the day.', inre: 'Has seen on camera that it was not you, but wants to see how you react.', forsta: 'Close the door behind you. Sit down.' }
+  }
+];
+
+export const CONTENT = {
+  sv: { challenges: SV_CHALLENGES, warmup: SV_WARMUP, fivewaysLines: SV_FIVEWAYS_LINES, fivewaysWays: SV_FIVEWAYS_WAYS, monologues: SV_MONOLOGUES, improvs: SV_IMPROVS },
+  en: { challenges: EN_CHALLENGES, warmup: EN_WARMUP, fivewaysLines: EN_FIVEWAYS_LINES, fivewaysWays: EN_FIVEWAYS_WAYS, monologues: EN_MONOLOGUES, improvs: EN_IMPROVS }
+};
+
+const current = CONTENT[lang()] || CONTENT.sv;
+export const CHALLENGES = current.challenges;
+export const WARMUP = current.warmup;
+export const FIVEWAYS_LINES = current.fivewaysLines;
+export const FIVEWAYS_WAYS = current.fivewaysWays;
+export const MONOLOGUES = current.monologues;
+export const IMPROVS = current.improvs;

@@ -7,13 +7,13 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="color-scheme" content="dark">
 <title>{{page_title}}</title>
-<link rel="stylesheet" href="app.css">
-<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="{{@root}}app.css">
+<link rel="icon" href="{{@root}}icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="{{@root}}icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 <meta name="theme-color" content="#0d0b09">
 <meta name="apple-mobile-web-app-title" content="{{app_name}}">
-<script type="module" src="app.js"></script>
+<script type="module" src="{{@root}}app.js"></script>
 </head>
 <body>
 <div class="testband">{{test_band}}</div>
@@ -23,8 +23,9 @@
   <!-- 1. Hem -->
   <section data-screen="start" class="home" aria-labelledby="h-start">
     <div class="topbar">
-      <img src="icons/icon-192.png" alt="" class="appicon" width="34" height="34">
+      <img src="{{@root}}icons/icon-192.png" alt="" class="appicon" width="34" height="34">
       <span class="appname">{{app_name}}</span>
+      <a class="lang-link" href="{{@other}}" hreflang="{{lang_other_code}}" lang="{{lang_other_code}}" aria-label="{{lang_other_label}}">{{icon:globe}}{{lang_other}}</a>
     </div>
     <h1 id="h-start" tabindex="-1" class="greeting">{{greet_day}}</h1>
     <p class="sub">{{home_sub}}</p>

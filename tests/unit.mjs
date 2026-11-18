@@ -3,9 +3,9 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from '../public/check.js';
-import { SCENES } from '../public/scenes.js';
-import { sv, t } from '../public/texts.js';
-import { renderPage, renderManifest, readTemplates, PUBLIC, MANIFEST } from '../tools/render-pages.mjs';
+import { SCENES, SCENES_BY_LANG } from '../public/scenes.js';
+import { sv, en, t, TEXTS, LANGS } from '../public/texts.js';
+import { renderPage, renderManifest, readTemplates, PUBLIC, MANIFEST, LANG_DIRS, pageOptions } from '../tools/render-pages.mjs';
 import path from 'node:path';
 
 const failures = [];
@@ -49,10 +49,11 @@ check(rateLight(lumaStats(image(220)))[0] === 'warn', 'Mycket ljus bild (220) bl
 check(rateLight(lumaStats(image(120, 0.3)))[0] === 'bad', 'Bild med 30 % vitt (motljus) blir röd');
 check(rateLight(null)[0] === 'warn', 'Saknad bild ger en uppmaning att kontrollera själv');
 
-// ---- Scenernas format ----
+// ---- Scenernas format, på alla språk ----
+for (const [language, scenes] of Object.entries(SCENES_BY_LANG)) {
 const ids = new Set();
-for (const s of SCENES) {
-  const where = `Scen ${s.id || '?'}`;
+for (const s of scenes) {
+  const where = `Scen ${s.id || '?'} (${language})`;
   check(typeof s.id === 'string' && /^scen-\d{3}$/.test(s.id) && !ids.has(s.id), `${where}: id är unikt och har rätt form`);
   ids.add(s.id);
   check(typeof s.titel === 'string' && s.titel.length > 0, `${where}: har titel`);
@@ -72,6 +73,11 @@ for (const s of SCENES) {
   }
   check(s.ai_stod === true || s.ai_stod === false, `${where}: anger om AI har hjälpt till`);
 }
+}
+// Varje språk har samma scener, med samma roller, repliker i samma ordning och samma bilder.
+const shape = (s) => JSON.stringify([s.id, s.bild, s.langd_sekunder, s.status, s.roller.map((r) => r.id), s.repliker.map((l) => l.roll)]);
+check(LANGS.every((l) => SCENES_BY_LANG[l] && SCENES_BY_LANG[l].map(shape).join() === SCENES_BY_LANG.sv.map(shape).join()), 'Scenerna är desamma på alla språk');
+check(SCENES === SCENES_BY_LANG.sv, 'Utan sida, som här, används de svenska scenerna');
 
 // ---- Bilder, utmaningar och uppvärmning ----
 const { CHALLENGES, challengeFor, WARMUP } = await import('../public/content.js');
@@ -88,6 +94,17 @@ check(challengeFor(new Date(2026, 0, 1)) !== challengeFor(new Date(2026, 0, 2)) 
 check(WARMUP.length === 4 && WARMUP.every((w) => w.titel && w.text && (w.sekunder || w.lista)), 'Uppvärmningen har fyra steg med text och klocka eller lista');
 const breath = WARMUP.find((w) => w.andning);
 check(!!breath && breath.andning.reduce((sum, [, sec]) => sum + sec, 0) * 3 === breath.sekunder, 'Andningen går jämnt upp i tre varv');
+const { CONTENT } = await import('../public/content.js');
+const contentShape = (c) => JSON.stringify([
+  c.challenges.length, c.warmup.map((w) => [w.id, w.sekunder, (w.lista || []).length]), c.fivewaysLines.length, c.fivewaysWays.length,
+  c.monologues.map((m) => [m.id, m.stycken.length, m.langd_sekunder]), c.improvs.map((i) => [i.id, !!i.ai.forsta])
+]);
+check(LANGS.every((l) => CONTENT[l] && contentShape(CONTENT[l]) === contentShape(CONTENT.sv)), 'Övningarna finns på alla språk, med lika många delar');
+const { lang_other_label: _otherLabel, ...englishTexts } = en; // länken till svenska är på svenska
+const allEnglish = JSON.stringify([CONTENT.en, SCENES_BY_LANG.en, englishTexts]).replace(/Övningssidan/g, '');
+check(!/[åäö]/i.test(allEnglish), 'Det engelska innehållet har inga svenska bokstäver kvar');
+const { STYLES_BY_LANG } = await import('../public/style.js');
+check(LANGS.every((l) => STYLES_BY_LANG[l] && STYLES_BY_LANG[l].map((x) => x.id).join() === STYLES_BY_LANG.sv.map((x) => x.id).join() && STYLES_BY_LANG[l].every((x) => x.namn && x.text && x.hur)), 'Spelstilarna har namn och texter på alla språk');
 
 // ---- Mina tagningar ----
 const { FREE_TAKES, canSaveMore, takeId, isQuotaError } = await import('../public/takes.js');
@@ -99,12 +116,17 @@ check(isQuotaError({ name: 'QuotaExceededError' }) && !isQuotaError(new Error('a
 // ---- Texterna ----
 // Alla texter ligger i texts.js. Sidorna i templates/ och manifest.json skapas från dem.
 const templates = await readTemplates();
-for (const [name, template] of templates) {
-  check(renderPage(template) === readFileSync(path.join(PUBLIC, name), 'utf8'),
-    `${name} är skapad från texts.js (kör annars node tools/render-pages.mjs)`);
+for (const language of LANGS) {
+  for (const [name, template] of templates) {
+    const file = path.join(LANG_DIRS[language], name);
+    check(existsSync(file) && renderPage(template, TEXTS[language], pageOptions(language)) === readFileSync(file, 'utf8'),
+      `${path.relative(PUBLIC, file)} är skapad från texts.js (kör annars node tools/render-pages.mjs)`);
+  }
+  const manifest = path.join(LANG_DIRS[language], 'manifest.json');
+  check(renderManifest(TEXTS[language], language) === readFileSync(manifest, 'utf8'),
+    `${path.relative(PUBLIC, manifest)} är skapad från texts.js (kör annars node tools/render-pages.mjs)`);
 }
-check(renderManifest() === readFileSync(MANIFEST, 'utf8'),
-  'manifest.json är skapad från texts.js (kör annars node tools/render-pages.mjs)');
+check(path.join(LANG_DIRS.sv, 'manifest.json') === MANIFEST, 'Den svenska appen har sitt manifest i public/');
 const code = ['public/app.js', 'public/check.js', 'tools/render-pages.mjs']
   .map((f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')).join('\n');
 const usedKeys = new Set([
@@ -120,6 +142,19 @@ check(missingKeys.length === 0, `Alla texter som används finns i texts.js (${mi
 check(unusedKeys.length === 0, `Alla texter i texts.js används (${unusedKeys.join(', ') || 'inga oanvända'})`);
 check(Object.values(sv).every((v) => typeof v === 'string' && v.trim() === v && v.length > 0), 'Inga tomma texter och inga mellanslag i början eller slutet');
 check(t('role_button', { name: 'Sam' }) === 'Spela Sam', 'Värden fylls i, till exempel Spela Sam');
+// Alla språk har samma texter, med samma värden att fylla i.
+const placeholders = (v) => [...v.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+for (const language of LANGS.filter((l) => l !== 'sv')) {
+  const texts = TEXTS[language];
+  const missing = Object.keys(sv).filter((k) => !(k in texts));
+  const extra = Object.keys(texts).filter((k) => !(k in sv));
+  check(missing.length === 0 && extra.length === 0, `Texterna på ${language} har samma nycklar som på svenska (${[...missing, ...extra].join(', ') || 'alla finns'})`);
+  const differ = Object.keys(sv).filter((k) => k in texts && placeholders(sv[k]) !== placeholders(texts[k]));
+  check(differ.length === 0, `Texterna på ${language} har samma värden att fylla i (${differ.join(', ') || 'alla stämmer'})`);
+  check(Object.values(texts).every((v) => typeof v === 'string' && v.trim() === v && v.length > 0), `Inga tomma texter på ${language}`);
+  check(texts.lang === language, `Språkkoden för ${language} stämmer`);
+}
+check(t('role_button', { name: 'Sam' }, 'en') === 'Play Sam' && en.lang === 'en', 'Engelska texter hämtas med språket, till exempel Play Sam');
 let threw = false;
 try { t('finns_inte'); } catch { threw = true; }
 check(threw, 'En felstavad textnyckel ger ett fel i stället för en tom text');

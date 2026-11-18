@@ -14,6 +14,17 @@ import {
   readSeconds, monthKey
 } from '../lib/plus.mjs';
 
+// Sidan som köpet och Stripes kundsida går tillbaka till, och texten vid köpknappen, per språk.
+const HOME = { sv: '/', en: '/en/' };
+const SUBMIT_TEXT = {
+  sv: 'Du kan ångra köpet inom 14 dagar och säga upp Plus när du vill.',
+  en: 'You can withdraw from the purchase within 14 days and cancel Plus whenever you like.'
+};
+async function pageLanguage(request) {
+  const body = await request.clone().json().catch(() => ({}));
+  return body && body.lang === 'en' ? 'en' : 'sv';
+}
+
 let cachedPrice = null;
 let cachedPortal = null;
 export const resetCache = () => { cachedPrice = null; cachedPortal = null; };
@@ -95,15 +106,17 @@ export async function handle(request, env = process.env, f = fetch, store = null
 
   try {
     if (route === 'checkout' && request.method === 'POST') {
+      const language = await pageLanguage(request);
+      const home = `${url.origin}${HOME[language]}`;
       const price = await plusPrice(f, key);
       const session = await stripe(f, key, 'POST', '/checkout/sessions', {
         mode: 'subscription',
         line_items: [{ price, quantity: 1 }],
-        success_url: `${url.origin}/?plus=klar&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${url.origin}/?plus=avbrutet`,
-        locale: 'sv',
-        subscription_data: { metadata: { app: 'ovningssida' } },
-        custom_text: { submit: { message: 'Du kan ångra köpet inom 14 dagar och säga upp Plus när du vill.' } }
+        success_url: `${home}?plus=klar&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${home}?plus=avbrutet`,
+        locale: language,
+        subscription_data: { metadata: { app: 'ovningssida', sprak: language } },
+        custom_text: { submit: { message: SUBMIT_TEXT[language] } }
       });
       return json({ url: session.url });
     }
@@ -131,9 +144,11 @@ export async function handle(request, env = process.env, f = fetch, store = null
     }
 
     if (route === 'portal' && request.method === 'POST') {
+      const language = await pageLanguage(request);
       const portal = await stripe(f, key, 'POST', '/billing_portal/sessions', {
         customer: payload.cus,
-        return_url: `${url.origin}/?plus=hantera`,
+        locale: language,
+        return_url: `${url.origin}${HOME[language]}?plus=hantera`,
         configuration: await portalConfig(f, key)
       });
       return json({ url: portal.url });

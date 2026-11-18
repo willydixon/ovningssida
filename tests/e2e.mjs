@@ -128,10 +128,23 @@ try {
   const info = await browser.newPage();
   const infoErrors = [];
   info.on('console', (m) => { if (m.type() === 'error') infoErrors.push(m.text()); });
-  for (const f of ['om', 'ai', 'integritet', 'villkor', 'kontakt']) {
-    const r = await info.goto(`${BASE}/${f}.html`);
-    check(r && r.ok(), `Informationssidan ${f}.html laddas`);
-    check((await info.locator('link[rel="manifest"]').count()) === 1, `${f}.html länkar till app-filen`);
+  for (const dir of ['', 'en/']) {
+    for (const f of ['om', 'ai', 'integritet', 'villkor', 'kontakt', 'kopvillkor']) {
+      const r = await info.goto(`${BASE}/${dir}${f}.html`);
+      check(r && r.ok(), `Informationssidan ${dir}${f}.html laddas`);
+      check((await info.locator('link[rel="manifest"]').count()) === 1, `${dir}${f}.html länkar till app-filen`);
+      check((await info.getAttribute('html', 'lang')) === (dir ? 'en' : 'sv') && await info.evaluate(() => getComputedStyle(document.body).fontFamily.includes('Inter')),
+        `${dir}${f}.html har rätt språk och sidans utseende`);
+      const hrefs = await info.$$eval('a[href]', (as) => as.map((a) => a.href));
+      const broken = [];
+      for (const href of new Set(hrefs.map((h) => h.split('?')[0].split('#')[0]))) {
+        if (!href.startsWith(BASE)) continue;
+        const res = await info.request.get(href);
+        if (!res.ok()) broken.push(href.replace(BASE, ''));
+      }
+      check(broken.length === 0, `Alla länkar på ${dir}${f}.html fungerar (${broken.join(', ') || 'inga trasiga'})`);
+      check((await info.locator('footer a[href="index.html?angra=1"]').count()) === 1, `${dir}${f}.html har ångerknappen i sidfoten`);
+    }
   }
   check(infoErrors.length === 0, `Inga fel på informationssidorna (${infoErrors.join(' | ') || 'inga'})`);
   await info.close();
@@ -160,6 +173,16 @@ try {
   const inst = await cdp.send('Page.getInstallabilityErrors');
   const instErrors = inst.installabilityErrors.map((e) => e.errorId);
   check(instErrors.length === 0, `Chrome kan installera sidan som app (${instErrors.join(', ') || 'inga hinder'})`);
+  await app.goto(`${BASE}/en/index.html`);
+  const amEn = await cdp.send('Page.getAppManifest');
+  const manifestEn = JSON.parse(amEn.data || '{}');
+  check(amEn.errors.length === 0 && manifestEn.start_url === '/en/' && manifestEn.lang === 'en', 'Den engelska appen öppnas på den engelska startsidan');
+  for (const icon of manifestEn.icons || []) {
+    const r = await app.request.get(new URL(icon.src, amEn.url).href);
+    check(r.ok() && pngSize(await r.body()) === icon.sizes, `Den engelska appens ikon ${icon.src} finns`);
+  }
+  const instEn = await cdp.send('Page.getInstallabilityErrors');
+  check(instEn.installabilityErrors.length === 0, `Chrome kan installera den engelska appen (${instEn.installabilityErrors.map((e) => e.errorId).join(', ') || 'inga hinder'})`);
   check(appErrors.length === 0, `Inga fel när app-filen läses (${appErrors.join(' | ') || 'inga'})`);
   await app.close();
 
@@ -203,9 +226,21 @@ try {
   check(!(await p5.locator('form[name="fragor"]').innerText()).match(/betala|kr\b|köp/i), 'Frågorna: inga frågor om att betala');
   check(await qform.evaluate((f) => !f.checkValidity()), 'Frågorna: går inte att skicka utan 18 år och samtycke');
 
+  check((await p5.locator('form[name="fragor"] input[name="sprak"]').inputValue()) === 'sv', 'Frågorna: språket skickas med');
   for (const f of ['tack', 'fragor-tack']) {
     const r = await p5.goto(`${BASE}/${f}.html`);
     check(r && r.ok(), `${f}.html laddas`);
+  }
+  // Samma formulär på engelska, till samma ställe hos Netlify.
+  await p5.goto(`${BASE}/en/anmalan.html?fran=tiktok`);
+  const enAttrs = await p5.locator('form[name="anmalan"]').evaluate((f) => [f.getAttribute('action'), f.querySelector('[name="sprak"]').value, f.querySelector('[name="form-name"]').value]);
+  check(enAttrs.join(' ') === '/en/tack.html en anmalan' && (await p5.locator('#fran').inputValue()) === 'tiktok' && (await p5.locator('h1').innerText()).startsWith('Get an email'),
+    `Anmälan på engelska: samma formulär, med språket, och tacksidan på engelska (${enAttrs.join(' ')})`);
+  await p5.goto(`${BASE}/en/fragor.html`);
+  check((await p5.locator('form[name="fragor"]').getAttribute('action')) === '/en/fragor-tack.html' && (await p5.locator('form[name="fragor"] textarea').count()) === 5, 'Frågorna på engelska');
+  for (const f of ['tack', 'fragor-tack']) {
+    const r = await p5.goto(`${BASE}/en/${f}.html`);
+    check(r && r.ok() && (await p5.getAttribute('html', 'lang')) === 'en', `en/${f}.html laddas på engelska`);
   }
   check(p5errors.length === 0, `Inga fel på de nya sidorna (${p5errors.join(' | ') || 'inga'})`);
   check(p5requests.every((r) => r.method === 'GET' && r.url.startsWith(BASE)), 'De nya sidorna skickar inget och anropar inga andra adresser');
@@ -1109,6 +1144,99 @@ try {
   check(p12odd.length === 0, `Din spelstil skickar inget över nätet (${p12odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
   check(p12errors.length === 0, `Inga fel i Din spelstil (${p12errors.join(' | ') || 'inga'})`);
   await p12ctx.close();
+
+  // ---- 13. Appen på engelska ----
+  const { SCENES_BY_LANG } = await import('../public/scenes.js');
+  const p13ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  const p13calls = [];
+  await p13ctx.route('**/api/**', (route) => {
+    const r = route.request();
+    const u = new URL(r.url());
+    p13calls.push({ path: u.pathname, method: r.method(), body: r.postData() || '' });
+    if (u.pathname === '/api/ai-start') {
+      if (u.searchParams.has('check')) return route.fulfill({ json: { available: true } });
+      return route.fulfill({ json: { available: true, plan: 'gratis', signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&token=en', max_seconds: 240 } });
+    }
+    if (u.pathname === '/api/plus/info') return route.fulfill({ json: { available: true, test: true, price: 99 } });
+    if (u.pathname === '/api/plus/checkout') return route.fulfill({ json: { url: `${BASE}/en/index.html?plus=avbrutet` } });
+    return route.fulfill({ status: 404, json: {} });
+  });
+  const p13 = await p13ctx.newPage();
+  const p13errors = [];
+  const p13requests = [];
+  p13.on('console', (m) => { if (m.type() === 'error') p13errors.push(m.text()); });
+  p13.on('pageerror', (e) => p13errors.push(String(e)));
+  p13.on('request', (r) => p13requests.push({ url: r.url(), method: r.method() }));
+  let enInit = null;
+  await p13.routeWebSocket(/elevenlabs\.io/, (ws) => {
+    ws.onMessage((message) => {
+      const msg = JSON.parse(String(message));
+      if (msg.type === 'conversation_initiation_client_data') {
+        enInit = msg;
+        ws.send(JSON.stringify({ type: 'conversation_initiation_metadata', conversation_initiation_metadata_event: { conversation_id: 'c13', agent_output_audio_format: 'pcm_16000', user_input_audio_format: 'pcm_16000' } }));
+      }
+    });
+  });
+
+  await p13.goto(`${BASE}/index.html`);
+  check((await p13.locator('.lang-link').innerText()) === 'English' && (await p13.locator('.lang-link').getAttribute('href')) === 'en/', 'Språk: den svenska hemskärmen har en länk till engelska');
+  await p13.locator('.lang-link').click();
+  await p13.waitForURL(/\/en\/$/);
+  await p13.evaluate(() => document.fonts.ready);
+  check((await p13.getAttribute('html', 'lang')) === 'en' && ['Good morning.', 'Hi.', 'Good evening.', 'Good night.'].includes(await p13.locator('#h-start').innerText()), 'Språk: den engelska hemskärmen hälsar på engelska');
+  const visible = (await p13.locator('body').innerText()).replace(/Övningssidan|Svenska/gi, ''); // appens namn visas med versaler
+  check(!/[åäöÅÄÖ]/.test(visible), 'Språk: ingen svensk text syns på den engelska hemskärmen');
+  check((await p13.locator('.lang-link').innerText()) === 'Svenska' && (await p13.locator('.lang-link').getAttribute('href')) === '../', 'Språk: den engelska hemskärmen har en länk tillbaka till svenska');
+
+  await p13.locator('.tile[data-action="play-scenes"]').click();
+  await p13.locator('#age-ok').check();
+  await p13.locator('#age-continue').click();
+  await p13.locator('.scene').first().waitFor();
+  const enTitles = await p13.locator('.scene strong').allInnerTexts();
+  const enChips = await p13.locator('#genre-chips .chip').allInnerTexts();
+  check(enTitles.join('|') === SCENES_BY_LANG.en.map((x) => x.titel).join('|') && enChips.join(',') === 'All,Drama,Comedy,Thriller,Romance', `Språk: scenerna och genrerna är på engelska (${enChips.join(', ')})`);
+  const enImages = await p13.$$eval('.scene-img', (imgs) => imgs.map((i) => i.complete && i.naturalWidth > 0 && new URL(i.src).pathname.startsWith('/img/')));
+  check(enImages.length === SCENES_BY_LANG.en.length && enImages.every(Boolean), 'Språk: bilderna hämtas från samma mapp som på svenska');
+  await p13.locator('.scene').first().click();
+  await p13.locator('#role-buttons button').first().click();
+  await p13.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p13.getByRole('button', { name: 'To the recording' }).click();
+  await p13.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p13.locator('#mode-ai').isChecked() && /You are talking to an AI/.test(await p13.locator('#ai-note').innerText()), 'Språk: det står på engelska att man pratar med en AI');
+  await p13.locator('#start-rec').click();
+  await p13.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  for (let i = 0; i < 80 && !enInit; i++) await sleep(50);
+  const enAgent = (enInit && enInit.conversation_config_override.agent) || {};
+  check(enAgent.language === 'en' && /^You are the scene partner/.test(enAgent.prompt.prompt) && enAgent.prompt.prompt.includes(SCENES_BY_LANG.en[0].situation),
+    'Språk: AI-motspelaren pratar engelska och får den engelska scenen');
+  await sleep(300);
+  await p13.locator('#stop-rec').click();
+  await p13.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  check((await p13.locator('#h-review').innerText()) === 'Watch the take' && (await p13.locator('#style-review h2').innerText()) === 'Your acting style', 'Språk: tagningen och spelstilen visas på engelska');
+  await p13.getByRole('button', { name: 'Save', exact: true }).click();
+  check(/^take-\d{8}-\d{4}\.(mp4|webm)$/.test((await p13.locator('#download-link').getAttribute('download')) || ''), 'Språk: filen får ett engelskt namn');
+  await p13.locator('#save-take-btn').click();
+  await p13.locator('#save-take-text').waitFor({ state: 'visible', timeout: 5000 });
+  check((await p13.locator('#save-take-text').innerText()) === 'Saved in My takes.', 'Språk: Mina tagningar fungerar på engelska');
+
+  // Plus på engelska: köpet säger till servern att Stripe ska visas på engelska.
+  await p13.goto(`${BASE}/en/index.html`);
+  await p13.locator('#plus-banner').click();
+  await p13.locator('#plus-test').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  check((await p13.locator('.plan-plus .price').innerText()) === '99 SEK a month' && (await p13.locator('#plus-buy a').getAttribute('href')) === 'kopvillkor.html', 'Språk: Plus på engelska, med köpvillkoren på engelska');
+  await Promise.all([p13.waitForURL(/plus=avbrutet/), p13.locator('#plus-buy-btn').click()]);
+  const enCheckout = p13calls.find((c) => c.path === '/api/plus/checkout');
+  check(enCheckout && JSON.parse(enCheckout.body).lang === 'en', 'Språk: köpet startas på engelska');
+  await p13.locator('#plus-message').waitFor({ state: 'visible', timeout: 5000 });
+  check((await p13.locator('#plus-message').innerText()) === 'The purchase was cancelled. Nothing has been charged.' && /\/en\//.test(p13.url()), 'Språk: efter Stripe kommer man tillbaka till den engelska sidan');
+  await p13.locator('footer a[href="?angra=1"]').click();
+  await p13.locator('[data-screen="angra"]').waitFor({ state: 'visible' });
+  check((await p13.locator('#h-angra').innerText()) === 'Withdraw from your purchase', 'Språk: ångerknappen finns på engelska');
+
+  const p13odd = p13requests.filter((r) => !(r.url.startsWith(BASE) || r.url.startsWith('blob:')) || (r.method !== 'GET' && !/\/api\/(ai-end|plus\/checkout)$/.test(new URL(r.url).pathname)));
+  check(p13odd.length === 0, `Språk: inget annat skickas från de engelska sidorna (${p13odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  check(p13errors.length === 0, `Inga fel på de engelska sidorna (${p13errors.join(' | ') || 'inga'})`);
+  await p13ctx.close();
 } finally {
   await browser.close();
   server.kill();

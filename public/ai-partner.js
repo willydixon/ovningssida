@@ -74,16 +74,16 @@ export function rateFromFormat(format) {
 
 // ---- Scenen som AI:n spelar ----
 
-// Instruktionen till AI:n. Den är på svenska eftersom samtalet är på svenska.
+// Instruktionen till AI:n, på samma språk som samtalet (svenska eller engelska).
 // Rollens vilja och inre liv (vill och inre i scenes.js) gör att AI:n har något
 // att spela, i stället för att bara svara artigt.
-export function buildAiSetup(scene, myRole) {
+export function buildAiSetup(scene, myRole, language = 'sv') {
   const names = Object.fromEntries(scene.roller.map((r) => [r.id, r.namn]));
   const aiRole = scene.roller.find((r) => r.id !== myRole);
   const userRole = scene.roller.find((r) => r.id === myRole);
   const script = scene.repliker.map((l) => `${names[l.roll]}: ${l.text}`).join('\n');
   const improv = scene.repliker.length === 0;
-  const prompt = [
+  const lines = language === 'en' ? englishPrompt(scene, aiRole, userRole, improv) : [
     'Du är motspelare i en övningsapp för skådespelare. Ni spelar en kort scen på svenska, som vid en provfilmning. Din uppgift är att få skådespelaren att spela på riktigt.',
     improv
       ? `Du spelar ${aiRole.namn}. Skådespelaren spelar den andra personen i situationen.`
@@ -109,16 +109,49 @@ export function buildAiSetup(scene, myRole) {
     '- Prata vardaglig svenska. Säg inga scenanvisningar och inga rollnamn före repliken.',
     '- Inget sexuellt innehåll.',
     '- Avsluta inte för tidigt. När scenen har nått ett naturligt slut säger du en sista kort replik och är sedan tyst.',
-    improv ? '' : 'Manus:',
-    script
-  ].filter(Boolean).join('\n');
+    improv ? '' : 'Manus:'
+  ];
+  const prompt = [...lines, improv ? '' : script].filter(Boolean).join('\n');
   const first = scene.repliker[0];
   return {
     prompt,
+    language: language === 'en' ? 'en' : 'sv',
     firstMessage: first ? (first.roll === aiRole.id ? first.text : '') : (aiRole.forsta || ''),
     aiName: aiRole.namn,
     myName: names[myRole]
   };
+}
+
+// Samma instruktion på engelska.
+function englishPrompt(scene, aiRole, userRole, improv) {
+  return [
+    'You are the scene partner in a practice app for actors. You are playing a short scene in English, as in an audition. Your job is to make the actor act for real.',
+    improv
+      ? `You play ${aiRole.namn}. The actor plays the other person in the situation.`
+      : `You play ${aiRole.namn}. The actor plays ${userRole.namn}.`,
+    improv
+      ? `The situation, as the actor was given it, where “you” means the actor: ${scene.situation}`
+      : `Situation: ${scene.situation}`,
+    aiRole.vill ? `This is what you, ${aiRole.namn}, want in the scene: ${aiRole.vill}` : '',
+    aiRole.inre ? `This is what you carry inside and do not say outright: ${aiRole.inre}` : '',
+    userRole.vill ? `${improv ? 'The actor' : userRole.namn} wants: ${userRole.vill} Do not make it too easy for them.` : '',
+    improv
+      ? 'There is no script. Improvise from the situation and what the actor actually says.'
+      : 'The script below is a starting point. Follow it as long as the actor follows it. If the actor says something else, improvise and respond to what is actually said.',
+    'How you play:',
+    '- Stay in character the whole time. Never break the scene to explain, give advice or judge the actor.',
+    '- Answer briefly, usually one or two sentences, as in a real dialogue. Sometimes a single word is enough.',
+    '- Listen to exactly what the actor says and how it is said, and react to it. Answer irony with irony or hurt silence, as a human would.',
+    '- Play with subtext. Show what you feel in how you answer, not by naming the feeling.',
+    '- Meet the actor’s energy. If they raise their voice, you can take it or push back. If they are quiet, you can become curious, suspicious or provoked.',
+    '- Keep the scene alive. Sometimes ask a question back, change the subject or add a small obstacle that fits the situation.',
+    '- Sometimes use the actor’s character name, as people do when things get sensitive.',
+    '- Use punctuation that shows how the line should sound: question marks, exclamation marks, dashes and three dots when you hesitate.',
+    '- Speak everyday English. Say no stage directions and no character names before the line.',
+    '- No sexual content.',
+    '- Do not end too early. When the scene has reached a natural end, say one last short line and then stay silent.',
+    improv ? '' : 'Script:'
+  ];
 }
 
 // ---- Samtalet ----
@@ -171,7 +204,7 @@ export class AiPartner {
 
   async connect(setup) {
     this.setStatus('connecting');
-    await this.ctx.audioWorklet.addModule('mic-worklet.js');
+    await this.ctx.audioWorklet.addModule(new URL('mic-worklet.js', import.meta.url).href); // samma mapp som skriptet, även från public/en/
     const headers = this.authToken ? { authorization: `Bearer ${this.authToken}` } : {};
     const res = await this.fetchImpl('/api/ai-start', { cache: 'no-store', headers });
     const data = await res.json().catch(() => ({}));
@@ -198,7 +231,7 @@ export class AiPartner {
     this.out = this.ctx.createGain();
     this.out.connect(this.ctx.destination);
 
-    const agent = { prompt: { prompt: setup.prompt }, language: 'sv' };
+    const agent = { prompt: { prompt: setup.prompt }, language: setup.language || 'sv' };
     if (setup.firstMessage) agent.first_message = setup.firstMessage;
     const ws = new this.WebSocketImpl(data.signed_url);
     this.ws = ws;

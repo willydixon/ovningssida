@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sv } from '../public/texts.js';
+import { sv, TEXTS, LANGS } from '../public/texts.js';
 import { ART, resetIds } from './scene-art.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,6 +17,12 @@ export const TEMPLATES = path.join(root, 'templates');
 export const PUBLIC = path.join(root, 'public');
 export const MANIFEST = path.join(PUBLIC, 'manifest.json');
 export const IMAGES = path.join(PUBLIC, 'img');
+// Svenska sidor ligger i public/, engelska i public/en/. Skript, stil, ikoner och bilder
+// är gemensamma och ligger i public/.
+export const LANG_DIRS = { sv: PUBLIC, en: path.join(PUBLIC, 'en') };
+export const pageOptions = (lang) => (lang === 'sv'
+  ? { root: '', base: '/', other: 'en/' }
+  : { root: '../', base: `/${lang}/`, other: '../' });
 const ICONS = path.join(root, 'tools', 'icons');
 
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -29,8 +35,11 @@ export function iconSvg(name) {
     .replace('<svg class="', '<svg aria-hidden="true" focusable="false" class="ic ');
 }
 
-export function renderPage(template, texts = sv) {
+// {{@root}} blir vägen till de gemensamma filerna, {{@base}} sidans mapp på servern och
+// {{@other}} sidan på det andra språket.
+export function renderPage(template, texts = sv, options = pageOptions('sv')) {
   return template
+    .replace(/\{\{@(root|base|other)\}\}/g, (match, name) => options[name])
     .replace(/\{\{icon:([a-z-]+)\}\}/g, (match, name) => iconSvg(name))
     .replace(/\{\{(\w+)\}\}/g, (match, key) => {
       if (typeof texts[key] !== 'string') throw new Error(`Texten saknas: ${key}`);
@@ -60,23 +69,24 @@ export async function readTemplates() {
   return Promise.all(names.map(async (name) => [name, await readFile(path.join(TEMPLATES, name), 'utf8')]));
 }
 
-export function renderManifest(texts = sv) {
+export function renderManifest(texts = sv, lang = 'sv') {
+  const { base, root } = pageOptions(lang);
   const manifest = {
-    id: '/',
+    id: base,
     name: texts.app_name,
     short_name: texts.app_name,
     description: texts.app_description,
     lang: texts.lang,
     dir: 'ltr',
-    start_url: '/',
-    scope: '/',
+    start_url: base,
+    scope: base,
     display: 'standalone',
     background_color: '#0d0b09',
     theme_color: '#0d0b09',
     icons: [
-      { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-      { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      { src: `${root}icons/icon-192.png`, sizes: '192x192', type: 'image/png' },
+      { src: `${root}icons/icon-512.png`, sizes: '512x512', type: 'image/png' },
+      { src: `${root}icons/icon-maskable-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
     ]
   };
   return `${JSON.stringify(manifest, null, 2)}\n`;
@@ -85,12 +95,15 @@ export function renderManifest(texts = sv) {
 // Skriv filerna bara när skriptet körs direkt, inte när testerna importerar det.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const templates = await readTemplates();
-  for (const [name, template] of templates) {
-    await writeFile(path.join(PUBLIC, name), renderPage(template));
+  for (const lang of LANGS) {
+    await mkdir(LANG_DIRS[lang], { recursive: true });
+    for (const [name, template] of templates) {
+      await writeFile(path.join(LANG_DIRS[lang], name), renderPage(template, TEXTS[lang], pageOptions(lang)));
+    }
+    await writeFile(path.join(LANG_DIRS[lang], 'manifest.json'), renderManifest(TEXTS[lang], lang));
   }
-  await writeFile(MANIFEST, renderManifest());
   await mkdir(IMAGES, { recursive: true });
   const images = renderImages();
   for (const [name, svg] of images) await writeFile(path.join(IMAGES, name), svg);
-  console.log(`Skrev ${templates.map(([name]) => name).join(', ')}, manifest.json och ${images.length} scenbilder.`);
+  console.log(`Skrev ${templates.map(([name]) => name).join(', ')} och manifest.json på ${LANGS.join(' och ')}, och ${images.length} scenbilder.`);
 }

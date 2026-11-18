@@ -11,7 +11,7 @@ import { AiPartner, buildAiSetup } from './ai-partner.js';
 import { challengeFor, WARMUP, fiveWaysScene, MONOLOGUES, monologueScene, IMPROVS, improvScene } from './content.js';
 import { FRAME_MS, pitchHz, createStyleMeter, readStyle, styleById, band } from './style.js';
 import { FREE_TAKES, canSaveMore, takeId, listTakes, getTake, addTake, deleteTake, countTakes, isQuotaError } from './takes.js';
-import { t } from './texts.js'; // alla texter som visas ligger i texts.js
+import { t, lang } from './texts.js'; // alla texter som visas ligger i texts.js, på sidans språk
 
 // Längsta tagning och AI-minuter beror på planen. Se också netlify/lib/plus.mjs.
 const PLANS = {
@@ -379,7 +379,7 @@ function renderScenes() {
     if (scene.bild) {
       const img = document.createElement('img');
       img.className = 'scene-img';
-      img.src = `img/${scene.bild}.svg`;
+      img.src = new URL(`img/${scene.bild}.svg`, import.meta.url).href; // samma mapp som skriptet, även från public/en/
       img.alt = '';
       img.width = 400;
       img.height = 240;
@@ -887,17 +887,19 @@ const synth = window.speechSynthesis || null;
 const LEVEL_MS = 50;
 const AFTER_PARTNER_MS = 400; // efterklang från rösten som inte ska räknas som tal
 
-function findSwedishVoice() {
+// En uppläsningsröst på sidans språk, till exempel svenska på de svenska sidorna.
+function findVoice() {
   if (!synth || typeof synth.getVoices !== 'function' || !window.SpeechSynthesisUtterance) return null;
   let voices = [];
   try { voices = synth.getVoices() || []; } catch { voices = []; }
   // Bara röster som finns i mobilen. En röst som går via nätet skulle skicka replikerna iväg.
-  const swedish = voices.filter((v) => /^sv([-_]|$)/i.test(v.lang || '') && v.localService !== false);
-  return swedish.find((v) => v.default) || swedish[0] || null;
+  const code = new RegExp(`^${lang()}([-_]|$)`, 'i');
+  const matching = voices.filter((v) => code.test(v.lang || '') && v.localService !== false);
+  return matching.find((v) => v.default) || matching[0] || null;
 }
 
 function updateVoice() {
-  state.voice = findSwedishVoice();
+  state.voice = findVoice();
   const found = !!state.voice;
   $('#partner-toggle').hidden = !found;
   $('#partner-no-voice').hidden = found;
@@ -1151,7 +1153,7 @@ function addAiLine(who, text, setup) {
 }
 
 function startAi() {
-  const setup = buildAiSetup(state.scene, state.role);
+  const setup = buildAiSetup(state.scene, state.role, lang());
   const log = $('#ai-log');
   log.textContent = '';
   log.hidden = false;
@@ -1288,7 +1290,8 @@ function renderStyle(box, reading) {
     const fill = el('span', '', 'style-fill');
     fill.style.width = `${match.procent}%`;
     track.append(fill);
-    row.append(el('span', match.namn, 'style-name'), el('span', `${match.procent} %`, 'style-pct'), track);
+    const name = (styleById(match.id) || match).namn; // namnet på sidans språk
+    row.append(el('span', name, 'style-name'), el('span', `${match.procent} %`, 'style-pct'), track);
     bars.append(row);
   }
   box.append(bars);
@@ -1363,7 +1366,7 @@ async function saveToTakes() {
   }
 }
 
-const takeDate = (ms) => new Date(ms).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const takeDate = (ms) => new Date(ms).toLocaleString(t('date_locale'), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function takeMeta(take) {
   const values = { role: take.roll, date: takeDate(take.skapad), length: clock(take.sekunder || 0) };
@@ -1412,7 +1415,7 @@ async function showTakes(message = '') {
     if (take.stil && take.stil.enough) {
       const tag = document.createElement('span');
       tag.className = 'take-style';
-      tag.textContent = take.stil.matches[0].namn;
+      tag.textContent = (styleById(take.stil.matches[0].id) || take.stil.matches[0]).namn;
       text.append(tag);
     }
     button.append(icon, text);
@@ -1658,7 +1661,7 @@ async function buyPlus() {
   const button = $('#plus-buy-btn');
   button.disabled = true;
   try {
-    const { ok, data } = await api('/api/plus/checkout', { method: 'POST' });
+    const { ok, data } = await api('/api/plus/checkout', { method: 'POST', body: { lang: lang() } }); // Stripe på sidans språk, och tillbaka hit
     if (ok && data.url) {
       location.href = data.url; // Stripes betalsida
       return;
@@ -1670,7 +1673,7 @@ async function buyPlus() {
 
 async function openPortal() {
   try {
-    const { ok, data } = await api('/api/plus/portal', { method: 'POST' });
+    const { ok, data } = await api('/api/plus/portal', { method: 'POST', body: { lang: lang() } });
     if (ok && data.url) {
       location.href = data.url; // Stripes sida för kort och uppsägning
       return;
@@ -1723,7 +1726,7 @@ function showWithdraw() {
   $('#angra-ok').checked = false;
   $('#angra-send').disabled = true;
   if (payload) {
-    const date = new Date(payload.start * 1000).toLocaleDateString('sv-SE');
+    const date = new Date(payload.start * 1000).toLocaleDateString(t('date_locale'));
     $('#angra-contract').textContent = t('angra_contract', { id: payload.sub, date });
   }
   show('angra');
@@ -1737,7 +1740,7 @@ async function sendWithdraw() {
   try {
     const { ok, data } = await api('/api/plus/angra', { method: 'POST', body: { namn: name, bekraftat: true } });
     if (ok) {
-      const time = new Date(data.received).toLocaleString('sv-SE');
+      const time = new Date(data.received).toLocaleString(t('date_locale'));
       if (data.status === 'angrat') {
         result.textContent = t('angra_done', { time });
         setPlan(null);
@@ -1745,7 +1748,7 @@ async function sendWithdraw() {
         result.textContent = t('angra_already');
         setPlan(null);
       } else {
-        result.textContent = t('angra_cancelled', { time, date: new Date(data.ends * 1000).toLocaleDateString('sv-SE') });
+        result.textContent = t('angra_cancelled', { time, date: new Date(data.ends * 1000).toLocaleDateString(t('date_locale')) });
       }
       result.hidden = false;
       $('#angra-form').hidden = true;

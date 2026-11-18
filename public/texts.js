@@ -6,9 +6,13 @@
 // Efter en ändring här: kör `node tools/render-pages.mjs`, som skriver om
 // public/index.html och public/manifest.json. Testerna kontrollerar att det är gjort.
 //
-// Informationssidorna (om.html, ai.html, integritet.html, villkor.html och
-// kontakt.html) är egna filer och ligger inte här. Scenerna ligger i scenes.js.
-// En engelsk version läggs till som ett eget objekt bredvid sv.
+// Informationssidorna (om.html, ai.html, integritet.html, villkor.html,
+// kopvillkor.html och kontakt.html) är egna filer och ligger inte här. Scenerna
+// ligger i scenes.js och övningarna i content.js.
+//
+// Språken: sv (svenska) och en (engelska). De engelska sidorna ligger i public/en/.
+// Varje text måste finnas på alla språk, med samma {namn} i, och testerna kontrollerar det.
+// Spanska, tyska och franska läggs till på samma sätt.
 
 export const sv = {
   // ---- Hela sidan ----
@@ -17,6 +21,10 @@ export const sv = {
   app_name: 'Övningssidan',
   app_description: 'Öva korta svenska scener och spela in dig själv med mobilens kamera. Videon stannar i mobilen.',
   test_band: 'Testversion. Scenerna är utkast och inte granskade än.',
+  lang_other: 'English',
+  lang_other_code: 'en',
+  lang_other_label: 'Read in English',
+  date_locale: 'sv-SE',
 
   // ---- 1. Startsida ----
   // Hemskärmen
@@ -398,10 +406,415 @@ export const sv = {
   questions_thanks_text: 'Svaren hjälper oss att göra övningssidan bättre.'
 };
 
+// ---- Engelska ----
+// Samma nycklar som sv. Alla är utkast, översatta från de svenska.
+export const en = {
+  // ---- Whole page ----
+  lang: 'en',
+  page_title: 'Övningssidan, test version',
+  app_name: 'Övningssidan',
+  app_description: 'Practise short scenes and record yourself with your phone camera. The video stays on your phone.',
+  test_band: 'Test version. The scenes are drafts and have not been reviewed yet.',
+  lang_other: 'Svenska',
+  lang_other_code: 'sv',
+  lang_other_label: 'Läs på svenska',
+  date_locale: 'en-GB',
+
+  // ---- 1. Home ----
+  greet_morning: 'Good morning.',
+  greet_day: 'Hi.',
+  greet_evening: 'Good evening.',
+  greet_night: 'Good night.',
+  home_sub: 'Ready for a take?',
+  daily_kicker: 'Today’s challenge',
+  daily_button: 'Take the challenge',
+  daily_time: '2 min',
+  daily_you: 'You',
+  tile_scene: 'Play a scene',
+  tile_scene_text: 'Script and AI scene partner',
+  tile_improv: 'Improvise with AI',
+  tile_improv_text: 'No script. Just you and a character.',
+  tile_fiveways: 'One line, five ways',
+  tile_fiveways_text: 'Ironic, angry, in love …',
+  tile_warmup: 'Warm-up',
+  tile_warmup_text: 'Voice, breath and diction',
+  tile_monologue: 'Monologue',
+  tile_monologue_text: 'Your moment in the spotlight',
+  tile_takes: 'My takes',
+  tile_takes_text: 'See how you develop',
+
+  fiveways_title: 'One line, five ways',
+  fiveways_situation: 'Say the same line five times, in a new way each time. Pause briefly between them and the next way is highlighted. You can also tap Next.',
+  monologue_title: 'Monologue',
+  monologue_text: 'Choose a monologue. Pause briefly between the parts and the next part is highlighted.',
+  improv_title: 'Improvise with AI',
+  improv_text: 'Choose a situation. The AI plays the other person, and there is no script.',
+  improv_unavailable: 'The AI scene partner is not running yet. Try a scene with a script for now.',
+  pick_back: 'Back to home',
+  record_goal: 'You want: {vill}',
+  guided_done: 'Done. Tap Stop whenever you like.',
+  nav_label: 'Main menu',
+  nav_home: 'Home',
+  nav_scenes: 'Scenes',
+  nav_train: 'Train',
+
+  // Plus
+  plus_banner_title: 'Plus',
+  plus_banner_text: '60 AI minutes a month, a more lifelike AI voice and longer takes.',
+  plus_banner_have: 'You have Plus. {min} AI minutes left this month.',
+  plus_kicker: 'Plus',
+  plus_title: 'More AI and more time',
+  plus_test: 'Test mode: no real money is charged. Pay with the test card 4242 4242 4242 4242, any future date and any code.',
+  plus_free_title: 'Free',
+  plus_free_price: '0 SEK',
+  plus_free_1: 'All exercises and scenes',
+  plus_free_2: 'The phone’s voice as scene partner and 5 AI minutes to try',
+  plus_free_3: 'Takes up to 3 minutes',
+  plus_free_4: 'Room for 3 takes in My takes',
+  plus_plus_title: 'Plus',
+  plus_price: '99 SEK a month',
+  plus_plus_1: '60 AI minutes a month',
+  plus_plus_2: 'A more lifelike AI voice',
+  plus_plus_3: 'Takes up to 10 minutes',
+  plus_plus_4: 'Unlimited My takes',
+  plus_buy: 'Get Plus for 99 SEK a month',
+  plus_buy_note: 'The price includes VAT. No commitment, and you can cancel whenever you like. You have a 14-day right of withdrawal. Payments are handled by Stripe.',
+  plus_terms_link: 'Terms of purchase',
+  plus_manage: 'Change card or cancel',
+  plus_withdraw: 'Withdraw from purchase',
+  plus_minutes: 'You have {left} of {limit} AI minutes left this month.',
+  plus_unavailable: 'Purchases are not open yet. Plus is coming soon.',
+  plus_welcome: 'Welcome to Plus! Your 60 AI minutes are here now.',
+  plus_canceled: 'The purchase was cancelled. Nothing has been charged.',
+  plus_failed: 'Something went wrong with the purchase. Nothing has been charged. Please try again in a moment.',
+  plus_read_more: 'Read about Plus',
+  ai_minutes_free: '{min} free minutes left',
+  ai_minutes_plus: 'Plus: {min} minutes left',
+  ai_paywall_free: 'Your 5 free minutes with the AI scene partner are used up. With Plus you get 60 minutes a month.',
+  ai_paywall_plus: 'Your AI minutes for this month are used up. They are topped up when next month starts.',
+  ai_paywall_full: 'The free minutes with the AI scene partner are used up for today, for everyone. Try tomorrow, or get Plus.',
+  ai_status_minutes_out: 'The AI minutes ran out, so the AI scene partner stopped. Tap Stop when you are done.',
+  footer_withdraw: 'Withdraw from purchase',
+
+  // Withdrawal
+  angra_title: 'Withdraw from your purchase',
+  angra_text: 'Within 14 days of buying Plus you can withdraw and get the full amount back. After 14 days, Plus is cancelled instead at the end of the month you have paid for.',
+  angra_name: 'Your name',
+  angra_contract: 'The contract you are withdrawing from: Plus, subscription {id}, bought {date}.',
+  angra_confirm: 'I want to withdraw from my purchase of Plus.',
+  angra_button: 'Withdraw from purchase',
+  angra_done: 'Your purchase is withdrawn. We received your withdrawal at {time}. The full amount is refunded to the card you paid with.',
+  angra_already: 'Plus has already ended, so nothing more will be charged.',
+  angra_cancelled: 'More than 14 days have passed, so Plus has been cancelled instead. You have Plus until {date}. We received this at {time}.',
+  angra_none: 'This phone has no purchase of Plus. If you bought it on another phone, open the app there or get in touch via Contact.',
+  angra_failed: 'The withdrawal did not go through right now. Try again in a moment, or get in touch via Contact.',
+
+  // Warm-up
+  warmup_step: 'Warm-up · {n} of {total}',
+  warmup_start: 'Start the clock',
+  warmup_next: 'Next',
+  warmup_finish: 'Done',
+  warmup_new_twister: 'Another tongue twister',
+  warmup_time_left: '{time} left',
+  warmup_time_done: 'Done. Move on when you like.',
+  breath_in: 'Breathe in',
+  breath_hold: 'Hold',
+  breath_out: 'Breathe out',
+  warmup_done_title: 'Now you are warm',
+  warmup_done_text: 'Your voice, breath and mouth are going. Make the most of it while it lasts.',
+  warmup_done_scene: 'Play a scene',
+  warmup_done_daily: 'Today’s challenge',
+
+  start_promise_1_title: 'Practice, no grades.',
+  start_promise_1_text: 'The app does not judge your acting or your looks.',
+  start_promise_2_title: 'The video stays on your phone.',
+  start_promise_2_text: 'It is never sent to us.',
+  start_promise_3_title: 'Free and without an account.',
+  start_promise_3_text: 'This is a test version.',
+
+  inapp_title: 'Please open the page in Safari or Chrome.',
+  inapp_text: 'You seem to have opened the link inside an app, and the camera does not always work there.',
+  inapp_how: 'Tap the menu with three dots in the app and choose to open it in your browser, or copy the link.',
+  inapp_copy_button: 'Copy the link',
+  inapp_copied: 'The link is copied. Paste it into Safari or Chrome.',
+  inapp_copy_manual: 'Copy the link here: {url}',
+
+  // ---- 2. Confirm 18 ----
+  age_title: 'This service is for adults',
+  age_text: 'You need to be 18 or older to use the camera here. Your answer is not saved, so the question comes back next time.',
+  age_checkbox: 'I am 18 or older',
+  age_button_back: 'Back',
+  age_button_continue: 'Continue',
+
+  // ---- 3. Choose scene and role ----
+  scenes_title: 'Choose a scene',
+  scenes_text: 'All scenes are for two people. Choose a scene and the role you want to play.',
+  genre_label: 'Choose a genre',
+  genre_all: 'All',
+  scene_draft_badge: 'Draft',
+  scene_meta: 'About {length} · {roles} roles · {approval}',
+  scene_approved_by: 'Written with AI help, approved by {name}',
+  scene_not_reviewed: 'Written with AI help, not reviewed yet',
+  length_seconds: '{n} s',
+  length_minutes: '{n} min',
+  role_title: 'Which role do you want to play?',
+  role_button: 'Play {name}',
+  button_other_scene: 'Choose another scene',
+
+  // ---- 4. Tech check ----
+  check_title: 'Tech check',
+  check_text: 'Place your phone so that your face and shoulders are inside the frame. The check only measures sound, light and framing.',
+  check_prompt_start: 'Tap Start the check. First stay quiet for two seconds, then say your first line in your normal voice.',
+  check_prompt_silence: 'Stay quiet for two seconds …',
+  check_prompt_speak: 'Now say your first line in your normal voice …',
+  check_prompt_no_audio: 'The sound could not be measured in this browser. Check the light and the picture yourself.',
+  check_prompt_done: 'Done. The advice is only about the technology, not your acting.',
+  check_button_start: 'Start the check',
+  check_button_again: 'Run the check again',
+  check_button_to_record: 'To the recording',
+  check_mirror_note: 'The preview is mirrored, like a mirror. The saved video is the right way round.',
+
+  check_name_speech: 'Sound',
+  check_name_peaks: 'Peaks',
+  check_name_noise: 'Background',
+  check_name_light: 'Light',
+  check_value_db: '{n} dB',
+  check_value_light: '{n} of 255',
+  check_frame_label: 'Framing: check yourself',
+  check_frame_advice: 'Your face and shoulders should be inside the frame, with a little space above your head.',
+
+  speech_bad_label: 'Sound too low',
+  speech_bad_advice: 'Move closer to the phone, speak in your normal voice and check that nothing covers the microphone.',
+  speech_low_label: 'Sound a little low',
+  speech_low_advice: 'Move a little closer to the phone or speak a little louder.',
+  speech_high_label: 'Loud sound',
+  speech_high_advice: 'Hold the phone a little further away.',
+  speech_good_label: 'Good sound level',
+  speech_good_advice: 'Your voice is heard clearly.',
+  peaks_bad_label: 'The sound is clipping',
+  peaks_bad_advice: 'Hold the phone further away or speak a little more quietly.',
+  peaks_warn_label: 'Close to the limit',
+  peaks_warn_advice: 'Speak a little more quietly or hold the phone further away.',
+  peaks_good_label: 'No clipping peaks',
+  peaks_good_advice: 'Loud sounds are heard without distortion.',
+  noise_bad_label: 'Lots of background noise',
+  noise_bad_advice: 'Change rooms, or close doors, windows and fans.',
+  noise_warn_label: 'Some background noise',
+  noise_warn_advice: 'Turn off music and fans if you can.',
+  noise_good_label: 'Quiet background',
+  noise_good_advice: 'Nothing disturbs your voice.',
+  light_none_label: 'The light could not be measured',
+  light_none_advice: 'Check yourself that your face is clearly visible.',
+  light_backlit_label: 'Backlight or too much light',
+  light_backlit_advice: 'Stand so that the light comes from the front, not from behind.',
+  light_dark_label: 'Too dark',
+  light_dark_advice: 'Face a window or turn on a lamp in front of you.',
+  light_dim_label: 'A little dark',
+  light_dim_advice: 'More light from the front makes the picture clearer.',
+  light_bright_label: 'Very bright',
+  light_bright_advice: 'Move a little away from the brightest light.',
+  light_good_label: 'Good light',
+  light_good_advice: 'Your face is clearly visible.',
+
+  // ---- 5. Record ----
+  record_title: 'Record',
+  record_button_start: 'Start recording',
+  record_button_stop: 'Stop',
+  record_script_label: 'The lines of the scene',
+  record_you: 'You, {name}',
+  record_max_note: 'A take can be at most {n} minutes.',
+
+  partner_legend: 'Scene partner',
+  partner_mode_ai: 'AI that answers you (test)',
+  partner_mode_none: 'No voice, I read myself',
+  ai_note: 'You are talking to an AI, not a human. The AI plays your scene partner and answers what you say, so you can follow the script or improvise. During the scene, the sound from the microphone is sent to ElevenLabs. The video stays on your phone.',
+  ai_status_connecting: 'The AI scene partner is starting …',
+  ai_status_listening: 'The AI is listening',
+  ai_status_speaking: 'The AI is talking',
+  ai_status_error: 'The AI scene partner could not start. The recording continues without it.',
+  ai_status_ended: 'The AI scene partner has hung up. Tap Stop when you are done.',
+  ai_log_label: 'The conversation with the AI scene partner',
+  ai_them: '{name} (AI)',
+  ai_you: 'You, {name}',
+
+  partner_toggle: 'The phone reads your partner’s lines aloud',
+  partner_note: 'The voice is the phone’s built-in text-to-speech voice and may be heard in the recording, like a partner behind the camera. The next line comes when you have said yours, or when you tap Next line.',
+  partner_no_voice: 'Your phone has no English text-to-speech voice that the page can use, so your partner’s lines are only shown as text.',
+  partner_next: 'Next line',
+  partner_done: 'The scene is over. Tap Stop when you are done.',
+
+  // ---- 6. Watch ----
+  review_title: 'Watch the take',
+  review_playback_error: 'Playback does not work in this browser, but you can still save the video.',
+  review_button_retake: 'Retake',
+  review_button_save: 'Save',
+  stopped_hidden: 'The recording stopped when you left the page. You can watch what was recorded, or retake.',
+  stopped_ended: 'The camera or microphone was turned off, for example by a call. You can watch what was recorded, or retake.',
+  stopped_error: 'Something went wrong during the recording. You can watch what was recorded, or retake.',
+  stopped_max: 'The take stopped after {n} minutes, which is the maximum length.',
+
+  // ---- 7. Save or share ----
+  save_title: 'Save the take',
+  save_text: 'The take only exists here until you save it. Save it in My takes to watch it again in the app, or on your phone to have it among your photos.',
+  save_take_button: 'Save in My takes',
+  save_take_done: 'Saved in My takes.',
+  save_take_already: 'This take is already in My takes.',
+  save_take_open: 'Show My takes',
+  save_phone_title: 'Save on your phone',
+  save_button_share: 'Save or share',
+  save_button_download: 'Download the video',
+  save_tip_iphone_title: 'iPhone:',
+  save_tip_iphone_text: 'tap Save or share and choose Save Video, and it ends up in Photos. A download ends up in the Files app instead.',
+  save_tip_android_title: 'Android:',
+  save_tip_android_text: 'a download ends up in the Downloads folder and usually shows up in Gallery or Google Photos.',
+  save_button_new_take: 'New take',
+  save_shared: 'Done. Check that the video is where you saved it.',
+  save_share_failed: 'Sharing did not work. Tap Download the video instead.',
+  file_prefix: 'take',
+  style_title: 'Your acting style',
+  style_lead: 'This is how your voice sounded in this take. It is not a judgement, just a mirror.',
+  style_most: 'Most {name}: {text}',
+  style_obs_tempo_low: 'The tempo was calm.',
+  style_obs_tempo_mid: 'The tempo was in between, neither calm nor fast.',
+  style_obs_tempo_high: 'The tempo was high.',
+  style_obs_pauses_none: 'You spoke without longer pauses.',
+  style_obs_pause_one: 'You took one pause, of {s} seconds.',
+  style_obs_pauses: 'You took {n} pauses. The longest was {s} seconds.',
+  style_obs_melody_low: 'Your voice stayed close to the same pitch.',
+  style_obs_melody_mid: 'Your voice went up and down a bit.',
+  style_obs_melody_high: 'Your voice went up and down a lot.',
+  style_obs_dynamics_low: 'The volume was even.',
+  style_obs_dynamics_mid: 'The volume varied a bit.',
+  style_obs_dynamics_high: 'The volume varied a lot, from quiet to loud.',
+  style_challenge: 'Challenge for your next take: play it as {name}, {how}.',
+  style_note: 'The acting styles are made up and are based only on your voice: tempo, pauses, pitch and volume. Your looks never count, and you are not compared with real actors.',
+  style_too_little: 'There was too little speech to show your acting style. Say a few sentences next time.',
+  takes_title: 'My takes',
+  takes_text: 'Your takes are only saved in the browser on this phone and are never sent to us. If you clear the browser they disappear, so save important takes on your phone too.',
+  takes_count_free: '{n} of {max} free places used.',
+  takes_count_over: 'You have {n} saved takes. Free has room for {max}, so delete some before you save more.',
+  takes_count_plus: 'With Plus you can save as many takes as you like. Saved now: {n}.',
+  takes_empty: 'No saved takes yet. Record something and tap Save in My takes.',
+  takes_record: 'Record a scene',
+  takes_unsaved: 'You have a take that is not saved yet.',
+  takes_unsaved_back: 'Back to the take',
+  takes_full: 'My takes has room for {max} takes for free. Delete a take to make room, or get Plus to save as many as you like.',
+  takes_no_space: 'Your phone has no room for more takes. Delete some, or save the take on your phone instead.',
+  takes_failed: 'My takes does not work in this browser, for example in private mode. Save the take on your phone instead.',
+  takes_deleted: 'The take is deleted.',
+  take_untitled: 'Take',
+  take_meta: '{date} · {length}',
+  take_meta_role: 'As {role} · {date} · {length}',
+  take_back: 'Back to My takes',
+  take_delete: 'Delete',
+  take_delete_confirm: 'Do you want to delete the take? This cannot be undone.',
+  take_delete_yes: 'Yes, delete',
+  take_delete_no: 'Cancel',
+  take_missing: 'The take is no longer in My takes.',
+
+  // ---- Help when the camera does not start ----
+  help_button_start: 'To the home page',
+  help_button_retry: 'Try again',
+  help_blocked_title: 'The camera or microphone is blocked',
+  help_blocked_1: 'The page needs permission to use the camera and microphone. Nothing is recorded until you start it yourself.',
+  help_blocked_2: 'iPhone with Safari: tap aA in the address bar, choose Website Settings and allow Camera and Microphone.',
+  help_blocked_3: 'Android with Chrome: tap the icon to the left of the address, choose Permissions and allow Camera and Microphone.',
+  help_blocked_4: 'Then tap Try again.',
+  help_no_camera_title: 'No camera found',
+  help_no_camera_1: 'This device seems to have no camera or microphone. Try with a phone.',
+  help_busy_title: 'The camera is used by something else',
+  help_busy_1: 'Close other apps that use the camera, for example a video call, and tap Try again.',
+  help_unsupported_title: 'This browser cannot record',
+  help_unsupported_1: 'Open the page in Safari on iPhone or in Chrome on Android.',
+  help_unsupported_2: 'Built-in browsers in apps like TikTok and Instagram often do not support recording. Tap the menu in the app and choose to open it in your browser.',
+  help_recorder_title: 'The recording could not start',
+  help_recorder_1: 'This browser does not support recording video. Try Safari on iPhone or Chrome on Android.',
+  help_empty_title: 'The take was empty',
+  help_empty_1: 'Nothing was recorded. Tap Try again. If it happens again, open the page in Safari or Chrome.',
+  help_default_title: 'The camera could not start',
+  help_default_1: 'Something stopped the camera. Close other apps that use the camera and tap Try again.',
+
+  // ---- Footer ----
+  footer_label: 'About the site',
+  footer_about: 'About',
+  footer_ai: 'How AI is used',
+  footer_privacy: 'Privacy',
+  footer_terms: 'Terms',
+  footer_contact: 'Contact',
+  footer_signup: 'Sign up',
+
+  // ---- Shared by the signup and the questions ----
+  test_band_pages: 'Test version. The texts are drafts.',
+  back_to_practice: '← Back to practice',
+  privacy_link: 'How we handle your data',
+  honeypot_label: 'Leave this field empty',
+
+  // ---- Signup ----
+  signup_page_title: 'Sign up, Övningssidan',
+  signup_title: 'Get an email when something new arrives',
+  signup_lead: 'We email you when there are new scenes and when the app can be downloaded. You can ask us to delete your address at any time.',
+  signup_email_label: 'Your email',
+  signup_source_label: 'Where did you hear about us?',
+  signup_source_choose: 'Choose',
+  signup_source_tiktok: 'TikTok',
+  signup_source_instagram: 'Instagram',
+  signup_source_google: 'Google',
+  signup_source_friend: 'From a friend',
+  signup_source_other: 'Other',
+  signup_android_label: 'I want to test the Android app when it exists',
+  signup_consent_label: 'Yes, you may save my email and email me about Övningssidan.',
+  signup_button: 'Sign me up',
+  thanks_page_title: 'Thank you, Övningssidan',
+  thanks_title: 'Thank you, you are signed up',
+  thanks_text: 'We will email you when there is something new. If you want us to delete your address, email us and we will.',
+
+  // ---- Questions for actors ----
+  questions_page_title: 'Questions for actors, Övningssidan',
+  questions_title: 'Questions for actors and teachers',
+  questions_lead: 'Help us build the right thing. Answer what you like. The answers are read by a human and are only used to develop Övningssidan.',
+  questions_role_label: 'I am',
+  questions_role_actor: 'An actor',
+  questions_role_teacher: 'A teacher or course leader',
+  questions_role_other: 'Other',
+  questions_q1: 'When did you last make a self-tape, and how did it go?',
+  questions_q2: 'Where did you find text to practise with?',
+  questions_q3: 'What is hardest when you practise alone?',
+  questions_q4: 'Would it help you to practise with an AI that plays your scene partner and answers you?',
+  questions_q5: 'What kind of feedback after a take would help you most?',
+  questions_q7_label: 'Yes, you may email me when there is something new to test',
+  questions_email_label: 'Your email, if you want an email',
+  questions_consent_label: 'Yes, you may save my answers for at most 12 months.',
+  questions_button: 'Send the answers',
+  questions_thanks_page_title: 'Thank you for your answers, Övningssidan',
+  questions_thanks_title: 'Thank you for your answers',
+  questions_thanks_text: 'The answers help us make Övningssidan better.'
+};
+
+export const TEXTS = { sv, en };
+export const LANGS = Object.keys(TEXTS);
+
+// Sidans språk står i <html lang="…">. Utan sida, som i testerna, är det svenska.
+export function pageLang() {
+  try {
+    const l = typeof document !== 'undefined' && document.documentElement ? document.documentElement.lang : '';
+    return LANGS.includes(l) ? l : 'sv';
+  } catch {
+    return 'sv';
+  }
+}
+
+let current = pageLang();
+export const lang = () => current;
+// Bara för testerna: byter språk utan en sida.
+export function setLang(l) {
+  if (!LANGS.includes(l)) throw new Error(`Okänt språk: ${l}`);
+  current = l;
+}
+
 // Hämtar en text och fyller i värdena. Okänd nyckel ger ett fel, så att en
 // felstavad nyckel upptäcks i testerna i stället för att synas på sidan.
-export function t(key, values = {}) {
-  const text = sv[key];
+export function t(key, values = {}, language = current) {
+  const text = TEXTS[language][key];
   if (typeof text !== 'string') throw new Error(`Texten saknas: ${key}`);
   return text.replace(/\{(\w+)\}/g, (match, name) => (name in values ? String(values[name]) : match));
 }

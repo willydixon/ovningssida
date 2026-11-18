@@ -1,0 +1,31 @@
+{
+  "id": "/en/",
+  "name": "Övningssidan",
+  "short_name": "Övningssidan",
+  "description": "Practise short scenes and record yourself with your phone camera. The video stays on your phone.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/en/",
+  "scope": "/en/",
+  "display": "standalone",
+  "background_color": "#0d0b09",
+  "theme_color": "#0d0b09",
+  "icons": [
+    {
+      "src": "../icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "../icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "../icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

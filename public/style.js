@@ -8,6 +8,8 @@
 // tonhöjd, styrka och energi. Utseendet räknas aldrig, och ingen jämförs med riktiga
 // skådespelare. Gränserna är startvärden som behöver provas på riktiga mobiler.
 
+import { lang } from './texts.js';
+
 export const FRAME_MS = 50;
 export const MIN_SPEECH_SECONDS = 3;
 
@@ -181,43 +183,34 @@ export function profile(m) {
   };
 }
 
-export const STYLES = [
-  {
-    id: 'berattaren',
-    namn: 'Berättaren',
-    text: 'Tar tid på sig, låter pauserna arbeta och målar med rösten.',
-    hur: 'ta god tid, pausa före det viktiga och låt rösten gå upp och ned',
-    mal: { tempo: 0.35, pauser: 0.65, dynamik: 0.5, melodi: 0.7, energi: 0.5 }
-  },
-  {
-    id: 'gnistan',
-    namn: 'Gnistan',
-    text: 'Högt tempo och mycket energi. Det händer något i varje replik.',
-    hur: 'högre tempo, mer energi och inga pauser att gömma sig i',
-    mal: { tempo: 0.85, pauser: 0.15, dynamik: 0.75, melodi: 0.65, energi: 0.85 }
-  },
-  {
-    id: 'lagmald',
-    namn: 'Den lågmälda',
-    text: 'Nära och återhållen. Säger mycket med lite.',
-    hur: 'lågt och nära, som om bara en person får höra',
-    mal: { tempo: 0.3, pauser: 0.5, dynamik: 0.2, melodi: 0.25, energi: 0.15 }
-  },
-  {
-    id: 'komikern',
-    namn: 'Komikern',
-    text: 'Lekfull melodi och snabba vändningar.',
-    hur: 'lekfullt, med stora skiften i tonen och snabba vändningar',
-    mal: { tempo: 0.75, pauser: 0.3, dynamik: 0.55, melodi: 0.9, energi: 0.6 }
-  },
-  {
-    id: 'ledaren',
-    namn: 'Ledaren',
-    text: 'Stadig och tydlig. Rösten bär utan att brås.',
-    hur: 'stadigt och tydligt, med jämn styrka och få ord som rusar',
-    mal: { tempo: 0.45, pauser: 0.35, dynamik: 0.3, melodi: 0.3, energi: 0.75 }
-  }
+// Målen för varje spelstil på skalan 0 till 1. Namnen och texterna finns på varje språk nedan.
+const TARGETS = [
+  { id: 'berattaren', mal: { tempo: 0.35, pauser: 0.65, dynamik: 0.5, melodi: 0.7, energi: 0.5 } },
+  { id: 'gnistan', mal: { tempo: 0.85, pauser: 0.15, dynamik: 0.75, melodi: 0.65, energi: 0.85 } },
+  { id: 'lagmald', mal: { tempo: 0.3, pauser: 0.5, dynamik: 0.2, melodi: 0.25, energi: 0.15 } },
+  { id: 'komikern', mal: { tempo: 0.75, pauser: 0.3, dynamik: 0.55, melodi: 0.9, energi: 0.6 } },
+  { id: 'ledaren', mal: { tempo: 0.45, pauser: 0.35, dynamik: 0.3, melodi: 0.3, energi: 0.75 } }
 ];
+
+const NAMES = {
+  sv: {
+    berattaren: { namn: 'Berättaren', text: 'Tar tid på sig, låter pauserna arbeta och målar med rösten.', hur: 'ta god tid, pausa före det viktiga och låt rösten gå upp och ned' },
+    gnistan: { namn: 'Gnistan', text: 'Högt tempo och mycket energi. Det händer något i varje replik.', hur: 'högre tempo, mer energi och inga pauser att gömma sig i' },
+    lagmald: { namn: 'Den lågmälda', text: 'Nära och återhållen. Säger mycket med lite.', hur: 'lågt och nära, som om bara en person får höra' },
+    komikern: { namn: 'Komikern', text: 'Lekfull melodi och snabba vändningar.', hur: 'lekfullt, med stora skiften i tonen och snabba vändningar' },
+    ledaren: { namn: 'Ledaren', text: 'Stadig och tydlig. Rösten bär utan att brås.', hur: 'stadigt och tydligt, med jämn styrka och få ord som rusar' }
+  },
+  en: {
+    berattaren: { namn: 'The Storyteller', text: 'Takes their time, lets the pauses work and paints with the voice.', hur: 'take your time, pause before what matters and let your voice rise and fall' },
+    gnistan: { namn: 'The Spark', text: 'High tempo and lots of energy. Something happens in every line.', hur: 'faster, with more energy and no pauses to hide in' },
+    lagmald: { namn: 'The Quiet One', text: 'Close and restrained. Says a lot with little.', hur: 'low and close, as if only one person may hear' },
+    komikern: { namn: 'The Comedian', text: 'Playful melody and quick turns.', hur: 'playfully, with big shifts in tone and quick turns' },
+    ledaren: { namn: 'The Leader', text: 'Steady and clear. The voice carries without rushing.', hur: 'steadily and clearly, with even volume and few rushed words' }
+  }
+};
+
+export const STYLES_BY_LANG = Object.fromEntries(Object.entries(NAMES).map(([l, names]) => [l, TARGETS.map((s) => ({ ...s, ...names[s.id] }))]));
+export const STYLES = STYLES_BY_LANG[lang()] || STYLES_BY_LANG.sv;
 
 const WEIGHTS = { tempo: 1, pauser: 1, dynamik: 1, melodi: 1, energi: 0.6 }; // energin beror också på avståndet till mobilen
 

@@ -119,6 +119,15 @@ await handle(req('checkout', { method: 'POST' }), ENV, stripe.fetchImpl, memoryS
 check(stripe.find('POST', '/products').length === 0 && stripe.find('POST', '/checkout/sessions')[0].params.get('line_items[0][price]') === 'price_finns',
   'Ett pris som redan finns hittas på sin nyckel');
 check(stripe.find('GET', '/prices')[0].params.get('lookup_keys[]') === 'plus-manad', 'Priset letas upp med nyckeln plus-manad');
+stripe = fakeStripe({ prices: [{ id: 'price_finns' }] });
+await handle(req('checkout', { method: 'POST', body: { lang: 'en' } }), ENV, stripe.fetchImpl, memoryStore());
+const english = stripe.find('POST', '/checkout/sessions')[0];
+check(english.params.get('locale') === 'en' && english.params.get('success_url') === 'https://exempel.netlify.app/en/?plus=klar&session_id={CHECKOUT_SESSION_ID}' &&
+  english.params.get('cancel_url') === 'https://exempel.netlify.app/en/?plus=avbrutet' && english.params.get('custom_text[submit][message]').startsWith('You can withdraw'),
+  'Från de engelska sidorna är betalsidan på engelska och går tillbaka till de engelska sidorna');
+stripe = fakeStripe({ prices: [{ id: 'price_finns' }] });
+await handle(req('checkout', { method: 'POST', body: { lang: 'xx' } }), ENV, stripe.fetchImpl, memoryStore());
+check(stripe.find('POST', '/checkout/sessions')[0].params.get('locale') === 'sv', 'Ett okänt språk ger svenska');
 
 // ---- Efter köpet ----
 const store = memoryStore();
@@ -167,7 +176,11 @@ const createdConfig = stripe.find('POST', '/billing_portal/configurations')[0];
 check(portal.url === 'https://billing.stripe.com/p/session/test_1' && portalSession.params.get('customer') === 'cus_1', 'Licenskoden ger en länk till kundens sida hos Stripe');
 check(createdConfig && createdConfig.params.get('features[subscription_cancel][mode]') === 'at_period_end' && createdConfig.params.get('metadata[app]') === 'ovningssida',
   'På Stripes sida kan man säga upp Plus till periodens slut');
-check(portalSession.params.get('return_url') === 'https://exempel.netlify.app/?plus=hantera', 'Från Stripes sida kommer man tillbaka hit');
+check(portalSession.params.get('return_url') === 'https://exempel.netlify.app/?plus=hantera' && portalSession.params.get('locale') === 'sv', 'Från Stripes sida kommer man tillbaka hit');
+stripe = fakeStripe({ portalConfigs: [{ id: 'bpc_finns', metadata: { app: 'ovningssida' } }] });
+await handle(req('portal', { method: 'POST', token: data.token, body: { lang: 'en' } }), ENV, stripe.fetchImpl, store);
+check(stripe.find('POST', '/billing_portal/sessions')[0].params.get('return_url') === 'https://exempel.netlify.app/en/?plus=hantera' &&
+  stripe.find('POST', '/billing_portal/sessions')[0].params.get('locale') === 'en', 'Från de engelska sidorna är kundsidan på engelska');
 resetCache();
 stripe = fakeStripe({ portalConfigs: [{ id: 'bpc_annan', metadata: {} }, { id: 'bpc_finns', metadata: { app: 'ovningssida' } }] });
 await handle(req('portal', { method: 'POST', token: data.token }), ENV, stripe.fetchImpl, store);

@@ -8,7 +8,7 @@ import { SCENES } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
 import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
 import { AiPartner, buildAiSetup } from './ai-partner.js';
-import { challengeFor, WARMUP } from './content.js';
+import { challengeFor, WARMUP, fiveWaysScene, MONOLOGUES, monologueScene, IMPROVS, improvScene } from './content.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
 const MAX_SECONDS = 180;
@@ -63,7 +63,7 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 
 // Skärmarna där menyn längst ned syns, och vilken flik som då är vald.
-const TABS = { start: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
+const TABS = { start: 'start', pick: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
 
 function show(name) {
   for (const el of document.querySelectorAll('[data-screen]')) {
@@ -129,6 +129,72 @@ function startDaily() {
     repliker: []
   };
   chooseRole('A');
+}
+
+// ---------- En replik fem sätt, monologer och improvisation ----------
+
+const youTexts = () => ({ you: t('daily_you'), title: t('fiveways_title'), situation: t('fiveways_situation') });
+
+function startExercise(scene) {
+  stopCamera();
+  clearTake();
+  state.scene = scene;
+  chooseRole('A');
+}
+
+// Listan att välja ur, för monologer och situationer att improvisera.
+function showPick({ title, text, notice = '', items, onChoose, disabled = false }) {
+  $('#h-pick').textContent = title;
+  $('#pick-text').textContent = text;
+  $('#pick-notice').textContent = notice;
+  $('#pick-notice').hidden = !notice;
+  const list = $('#pick-list');
+  list.textContent = '';
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'scene';
+    button.disabled = disabled;
+    const tags = document.createElement('span');
+    tags.className = 'tags';
+    const genre = document.createElement('span');
+    genre.className = 'tag';
+    genre.textContent = item.genre;
+    const badge = document.createElement('span');
+    badge.className = 'tag badge';
+    badge.textContent = t('scene_draft_badge');
+    tags.append(genre, badge);
+    const title2 = document.createElement('strong');
+    title2.textContent = item.titel;
+    const desc = document.createElement('span');
+    desc.textContent = item.text || item.situation;
+    button.append(tags, title2, desc);
+    button.addEventListener('click', () => onChoose(item));
+    list.append(button);
+  }
+  show('pick');
+}
+
+function pickMonologue() {
+  showPick({
+    title: t('monologue_title'),
+    text: t('monologue_text'),
+    items: MONOLOGUES,
+    onChoose: (m) => startExercise(monologueScene(m, youTexts()))
+  });
+}
+
+async function pickImprov() {
+  await refreshAiAvailability();
+  const ok = !!state.aiAvailable && !!window.AudioWorkletNode;
+  showPick({
+    title: t('improv_title'),
+    text: t('improv_text'),
+    notice: ok ? '' : t('improv_unavailable'),
+    items: IMPROVS,
+    disabled: !ok,
+    onChoose: (s) => startExercise(improvScene(s, youTexts()))
+  });
 }
 
 // ---------- Uppvärmning ----------
@@ -560,15 +626,27 @@ function renderScript() {
   intro.className = 'situation';
   intro.textContent = scene.situation;
   box.append(intro);
+  const myRole = scene.roller.find((r) => r.id === state.role);
+  if (myRole && myRole.vill) {
+    const goal = document.createElement('p');
+    goal.className = 'goal';
+    goal.textContent = t('record_goal', { vill: myRole.vill });
+    box.append(goal);
+  }
   for (const [index, line] of scene.repliker.entries()) {
     const p = document.createElement('p');
     const mine = line.roll === state.role;
     p.className = mine ? 'mine' : 'theirs';
     p.dataset.line = String(index);
-    const who = document.createElement('span');
-    who.className = 'who';
-    who.textContent = mine ? t('record_you', { name: names[line.roll] }) : names[line.roll];
-    p.append(who, document.createTextNode(line.text));
+    // etikett ersätter rollnamnet, till exempel sättet i En replik, fem sätt. Tom etikett: inget namn.
+    const label = typeof line.etikett === 'string' ? line.etikett : (mine ? t('record_you', { name: names[line.roll] }) : names[line.roll]);
+    if (label) {
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = label;
+      p.append(who);
+    }
+    p.append(document.createTextNode(line.text));
     box.append(p);
   }
 }
@@ -619,8 +697,8 @@ async function startRecording() {
   startButton.disabled = true;
   ensureAudioContext();
   const mode = partnerMode();
-  const withPartner = mode === 'voice';
-  if (withPartner) unlockSpeech(); // måste ske i själva trycket, före allt som väntar
+  const withPartner = mode === 'voice' || mode === 'guided'; // sidan följer repliken med ljudnivån
+  if (mode === 'voice') unlockSpeech(); // måste ske i själva trycket, före allt som väntar
   if (!streamIsLive()) {
     const ok = await startCamera();
     if (!ok) return;
@@ -759,8 +837,13 @@ function updateVoice() {
   updateModes();
 }
 
-// Vilken motspelare som är vald: 'ai', 'voice' (mobilens röst) eller 'none'.
+// Vilken motspelare som gäller: 'ai', 'voice' (mobilens röst), 'guided' (en övning där
+// sidan markerar nästa del när du pausar) eller 'none'.
 function partnerMode() {
+  const scene = state.scene;
+  if (scene && scene.typ === 'improv') return 'ai';
+  if (scene && scene.typ === 'guidad') return 'guided';
+  if (!scene || scene.roller.length < 2) return 'none';
   const checked = document.querySelector('input[name="partner"]:checked');
   return checked ? checked.value : 'none';
 }
@@ -768,11 +851,13 @@ function partnerMode() {
 // Visar bara de val som fungerar här, och texten som hör till det valda. Tills
 // användaren själv har valt gäller ordningen på sidan: AI, mobilens röst, ingen röst.
 function updateModes() {
-  // Dagens utmaning och andra övningar med en enda roll har ingen motspelare.
-  const solo = !state.scene || state.scene.roller.length < 2;
-  $('#partner-box').hidden = solo;
-  if (solo) {
-    $('#mode-none').checked = true;
+  // Övningarna har ingen valfri motspelare: dagens utmaning, monologen och En replik
+  // fem sätt spelas ensam, och improvisationen spelas alltid mot AI:n.
+  const scene = state.scene;
+  const fixed = !scene || scene.roller.length < 2 || scene.typ === 'improv' || scene.typ === 'guidad';
+  $('#partner-box').hidden = fixed;
+  if (fixed) {
+    $('#ai-note').hidden = partnerMode() !== 'ai';
     return;
   }
   const aiOk = !!state.aiAvailable && !!state.micSource && !!window.AudioWorkletNode;
@@ -897,6 +982,7 @@ function startPartner() {
     onEnd: () => {
       markLine(-1);
       $('#next-line').hidden = true;
+      $('#partner-done').textContent = t(state.scene.typ === 'guidad' ? 'guided_done' : 'partner_done');
       $('#partner-done').hidden = false;
     }
   });
@@ -1101,6 +1187,9 @@ document.addEventListener('click', (event) => {
       break;
     }
     case 'warmup': startWarmup(); break;
+    case 'fiveways': requireAdult(() => startExercise(fiveWaysScene(youTexts()))); break;
+    case 'monologue': requireAdult(pickMonologue); break;
+    case 'improv': requireAdult(pickImprov); break;
     case 'warmup-start': runWarmupTimer(); break;
     case 'warmup-next': nextWarmup(); break;
     case 'next-twister': {

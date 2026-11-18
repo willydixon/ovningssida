@@ -378,6 +378,7 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .script .mine { font-size: 1.15rem; font-weight: 600; }
 .script .mine .who { color: var(--accent); }
 .script .theirs { color: var(--quiet); }
+.script .goal { color: var(--accent); font-weight: 600; }
 
 /* Val av motspelare */
 .partner { border: 0; margin: 16px 0 0; padding: 0; }

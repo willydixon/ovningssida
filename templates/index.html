@@ -38,10 +38,10 @@
     </article>
     <div class="tiles">
       <button type="button" class="tile" data-action="play-scenes">{{icon:clapperboard}}<strong>{{tile_scene}}</strong><span>{{tile_scene_text}}</span></button>
-      <div class="tile soon">{{icon:messages-square}}<strong>{{tile_improv}}</strong><span>{{tile_improv_text}}</span><em>{{soon}}</em></div>
-      <div class="tile soon">{{icon:drama}}<strong>{{tile_fiveways}}</strong><span>{{tile_fiveways_text}}</span><em>{{soon}}</em></div>
+      <button type="button" class="tile" data-action="improv">{{icon:messages-square}}<strong>{{tile_improv}}</strong><span>{{tile_improv_text}}</span></button>
+      <button type="button" class="tile" data-action="fiveways">{{icon:drama}}<strong>{{tile_fiveways}}</strong><span>{{tile_fiveways_text}}</span></button>
       <button type="button" class="tile" data-action="warmup">{{icon:audio-lines}}<strong>{{tile_warmup}}</strong><span>{{tile_warmup_text}}</span></button>
-      <div class="tile soon">{{icon:lamp-desk}}<strong>{{tile_monologue}}</strong><span>{{tile_monologue_text}}</span><em>{{soon}}</em></div>
+      <button type="button" class="tile" data-action="monologue">{{icon:lamp-desk}}<strong>{{tile_monologue}}</strong><span>{{tile_monologue_text}}</span></button>
       <div class="tile soon">{{icon:film}}<strong>{{tile_takes}}</strong><span>{{tile_takes_text}}</span><em>{{soon}}</em></div>
     </div>
     <div class="notice" id="inapp-notice" hidden>
@@ -75,6 +75,15 @@
       <button type="button" class="secondary" data-action="warmup-start" id="warmup-start">{{warmup_start}}</button>
       <button type="button" class="primary" data-action="warmup-next" id="warmup-next">{{warmup_next}}</button>
     </div>
+  </section>
+
+  <!-- Välj monolog eller situation att improvisera -->
+  <section data-screen="pick" aria-labelledby="h-pick" hidden>
+    <h1 id="h-pick" tabindex="-1"></h1>
+    <p id="pick-text"></p>
+    <p class="notice" id="pick-notice" hidden></p>
+    <div id="pick-list" class="scene-list"></div>
+    <button type="button" class="ghost" data-action="to-start">{{pick_back}}</button>
   </section>
 
   <section data-screen="warmup-done" aria-labelledby="h-warmup-done" hidden>
@@ -153,10 +162,10 @@
         <input type="radio" name="partner" value="none" id="mode-none">
         <span>{{partner_mode_none}}</span>
       </label>
-      <p class="small" id="ai-note" hidden>{{ai_note}}</p>
       <p class="small" id="partner-note">{{partner_note}}</p>
       <p class="small" id="partner-no-voice" hidden>{{partner_no_voice}}</p>
     </fieldset>
+    <p class="small" id="ai-note" hidden>{{ai_note}}</p>
     <div class="controls">
       <div class="row">
         <button type="button" class="primary" data-action="start-rec" id="start-rec">{{record_button_start}}</button>

@@ -82,14 +82,21 @@ export function buildAiSetup(scene, myRole) {
   const aiRole = scene.roller.find((r) => r.id !== myRole);
   const userRole = scene.roller.find((r) => r.id === myRole);
   const script = scene.repliker.map((l) => `${names[l.roll]}: ${l.text}`).join('\n');
+  const improv = scene.repliker.length === 0;
   const prompt = [
     'Du är motspelare i en övningsapp för skådespelare. Ni spelar en kort scen på svenska, som vid en provfilmning. Din uppgift är att få skådespelaren att spela på riktigt.',
-    `Du spelar ${aiRole.namn}. Skådespelaren spelar ${userRole.namn}.`,
-    `Situation: ${scene.situation}`,
+    improv
+      ? `Du spelar ${aiRole.namn}. Skådespelaren spelar den andra personen i situationen.`
+      : `Du spelar ${aiRole.namn}. Skådespelaren spelar ${userRole.namn}.`,
+    improv
+      ? `Situationen, så som skådespelaren har fått den, där ”du” betyder skådespelaren: ${scene.situation}`
+      : `Situation: ${scene.situation}`,
     aiRole.vill ? `Det här vill du, ${aiRole.namn}, i scenen: ${aiRole.vill}` : '',
     aiRole.inre ? `Det här bär du på inombords, och säger inte rakt ut: ${aiRole.inre}` : '',
-    userRole.vill ? `${userRole.namn} vill: ${userRole.vill} Gör det inte för lätt för hen.` : '',
-    'Manuset nedan är en utgångspunkt. Följ det så länge skådespelaren följer det. Säger skådespelaren något annat, improvisera och svara på det som faktiskt sägs.',
+    userRole.vill ? `${improv ? 'Skådespelaren' : userRole.namn} vill: ${userRole.vill} Gör det inte för lätt för hen.` : '',
+    improv
+      ? 'Det finns inget manus. Improvisera utifrån situationen och det skådespelaren faktiskt säger.'
+      : 'Manuset nedan är en utgångspunkt. Följ det så länge skådespelaren följer det. Säger skådespelaren något annat, improvisera och svara på det som faktiskt sägs.',
     'Så spelar du:',
     '- Stanna i rollen hela tiden. Bryt aldrig scenen för att förklara, ge råd eller bedöma skådespelaren.',
     '- Svara kort, oftast en eller två meningar, som i en riktig dialog. Ibland räcker ett enda ord.',
@@ -102,13 +109,13 @@ export function buildAiSetup(scene, myRole) {
     '- Prata vardaglig svenska. Säg inga scenanvisningar och inga rollnamn före repliken.',
     '- Inget sexuellt innehåll.',
     '- Avsluta inte för tidigt. När scenen har nått ett naturligt slut säger du en sista kort replik och är sedan tyst.',
-    'Manus:',
+    improv ? '' : 'Manus:',
     script
   ].filter(Boolean).join('\n');
   const first = scene.repliker[0];
   return {
     prompt,
-    firstMessage: first.roll === aiRole.id ? first.text : '',
+    firstMessage: first ? (first.roll === aiRole.id ? first.text : '') : (aiRole.forsta || ''),
     aiName: aiRole.namn,
     myName: names[myRole]
   };

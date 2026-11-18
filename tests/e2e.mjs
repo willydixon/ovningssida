@@ -552,7 +552,7 @@ try {
   check((await p8.locator('#daily-text').innerText()) === challengeFor(new Date()), 'Hemskärmen visar dagens utmaning');
   check(await p8.evaluate(() => document.fonts.check('700 20px Fraunces') && document.fonts.check('400 16px Inter')), 'Typsnitten Fraunces och Inter laddas från den egna sidan');
   check(await p8.locator('#tabbar').isVisible() && (await p8.locator('#tabbar [aria-current="page"]').innerText()).includes('Hem'), 'Menyn längst ned syns och Hem är vald');
-  check((await p8.locator('.tile.soon').count()) === 4 && (await p8.locator('button.tile').count()) === 2, 'Hemskärmen: två övningar fungerar och fyra är märkta Snart');
+  check((await p8.locator('.tile.soon').count()) === 1 && (await p8.locator('button.tile').count()) === 5, 'Hemskärmen: fem övningar fungerar och Mina tagningar är märkt Snart');
 
   // Uppvärmningen behöver ingen kamera.
   await p8.locator('.tile[data-action="warmup"]').click();
@@ -602,6 +602,99 @@ try {
   check(await p8.locator('#partner-box').isVisible(), 'En scen med två roller visar valet av motspelare igen');
   check(p8errors.length === 0, `Inga fel på hemskärmen och i övningarna (${p8errors.join(' | ') || 'inga'})`);
   await p8ctx.close();
+
+  // ---- 9. En replik fem sätt, monolog och improvisation med AI ----
+  const { MONOLOGUES, IMPROVS } = await import('../public/content.js');
+  const p9ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  let aiOn = false;
+  await p9ctx.route('**/api/ai-start**', (route) => {
+    if (new URL(route.request().url()).searchParams.has('check')) return route.fulfill({ json: { available: aiOn } });
+    return route.fulfill({ json: { available: true, signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&token=improv' } });
+  });
+  const p9 = await p9ctx.newPage();
+  const p9errors = [];
+  p9.on('console', (m) => { if (m.type() === 'error') p9errors.push(m.text()); });
+  p9.on('pageerror', (e) => p9errors.push(String(e)));
+  let improvInit = null;
+  await p9.routeWebSocket(/elevenlabs\.io/, (ws) => {
+    ws.onMessage((message) => {
+      const msg = JSON.parse(String(message));
+      if (msg.type === 'conversation_initiation_client_data') {
+        improvInit = msg;
+        ws.send(JSON.stringify({ type: 'conversation_initiation_metadata', conversation_initiation_metadata_event: { conversation_id: 'c9', agent_output_audio_format: 'pcm_16000', user_input_audio_format: 'pcm_16000' } }));
+      }
+    });
+  });
+  const toRecordFromCheck = async () => {
+    await p9.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+    await p9.getByRole('button', { name: 'Till inspelningen' }).click();
+    await p9.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  };
+  const current9 = () => p9.evaluate(() => { const el = document.querySelector('#script .current'); return el ? Number(el.dataset.line) : -1; });
+
+  await p9.goto(`${BASE}/index.html`);
+  await p9.locator('.tile[data-action="fiveways"]').click();
+  await p9.locator('#age-ok').check();
+  await p9.locator('#age-continue').click();
+  await toRecordFromCheck();
+  const labels = await p9.locator('#script .who').allInnerTexts();
+  const lines5 = await p9.$$eval('#script .mine', (ps) => ps.map((el) => el.lastChild.textContent));
+  check(labels.length === 5 && new Set(labels).size === 5 && labels.every((l, i) => l.startsWith(`${i + 1}.`)) && new Set(lines5).size === 1,
+    'En replik, fem sätt: samma replik fem gånger med fem olika sätt');
+  check(await p9.locator('#partner-box').isHidden(), 'En replik, fem sätt: inget val av motspelare');
+  await p9.locator('#start-rec').click();
+  await p9.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  check((await current9()) === 0 && await p9.locator('#next-line').isVisible(), 'En replik, fem sätt: första sättet är markerat och Nästa finns');
+  for (let i = 0; i < 5; i++) await p9.locator('#next-line').click();
+  await p9.locator('#partner-done').waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+  check((await p9.locator('#partner-done').innerText()).startsWith('Klart.'), 'En replik, fem sätt: efter femte sättet står det Klart');
+  await p9.locator('#stop-rec').click();
+  await p9.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+
+  await p9.locator('[data-screen="review"] [data-action="retake"]').waitFor();
+  await p9.goto(`${BASE}/index.html`);
+  await p9.locator('.tile[data-action="monologue"]').click();
+  await p9.locator('#age-ok').check();
+  await p9.locator('#age-continue').click();
+  check(await p9.locator('[data-screen="pick"]').isVisible() && (await p9.locator('#pick-list .scene').count()) === MONOLOGUES.length, `Monolog: ${MONOLOGUES.length} monologer att välja bland`);
+  await p9.locator('#pick-list .scene').first().click();
+  await toRecordFromCheck();
+  check((await p9.locator('#script .mine').count()) === MONOLOGUES[0].stycken.length && (await p9.locator('#script .who').count()) === 0, 'Monolog: texten är delad i stycken utan rollnamn');
+  await p9.locator('#start-rec').click();
+  await p9.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  check((await current9()) === 0, 'Monolog: första stycket är markerat när tagningen börjar');
+  await p9.locator('#next-line').click();
+  check((await current9()) === 1, 'Monolog: Nästa går till nästa stycke');
+  await p9.locator('#stop-rec').click();
+  await p9.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+
+  await p9.goto(`${BASE}/index.html`);
+  await p9.locator('.tile[data-action="improv"]').click();
+  await p9.locator('#age-ok').check();
+  await p9.locator('#age-continue').click();
+  await p9.locator('[data-screen="pick"]').waitFor({ state: 'visible' });
+  check(await p9.locator('#pick-notice').isVisible() && await p9.locator('#pick-list .scene').first().isDisabled(), 'Improvisera: utan AI-motspelaren står det så, och situationerna går inte att välja');
+
+  aiOn = true;
+  await p9.goto(`${BASE}/index.html`);
+  await p9.locator('.tile[data-action="improv"]').click();
+  await p9.locator('#age-ok').check();
+  await p9.locator('#age-continue').click();
+  await p9.locator('[data-screen="pick"]').waitFor({ state: 'visible' });
+  check((await p9.locator('#pick-list .scene').count()) === IMPROVS.length && await p9.locator('#pick-notice').isHidden(), `Improvisera: ${IMPROVS.length} situationer att välja bland`);
+  await p9.locator('#pick-list .scene').first().click();
+  await toRecordFromCheck();
+  check(await p9.locator('#partner-box').isHidden() && await p9.locator('#ai-note').isVisible(), 'Improvisera: alltid mot AI:n, och det står att det är en AI');
+  check((await p9.locator('#script').innerText()).includes(IMPROVS[0].du.vill), 'Improvisera: det står vad du vill i situationen');
+  await p9.locator('#start-rec').click();
+  await p9.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  for (let i = 0; i < 80 && !improvInit; i++) await sleep(50);
+  const improvAgent = (improvInit && improvInit.conversation_config_override.agent) || {};
+  check(improvAgent.first_message === IMPROVS[0].ai.forsta && /inget manus/.test((improvAgent.prompt || {}).prompt || ''), 'Improvisera: AI:n börjar med karaktärens första replik och vet att det inte finns något manus');
+  await p9.locator('#stop-rec').click();
+  await p9.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  check(p9errors.length === 0, `Inga fel i övningarna (${p9errors.join(' | ') || 'inga'})`);
+  await p9ctx.close();
 } finally {
   await browser.close();
   server.kill();

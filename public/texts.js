@@ -42,6 +42,18 @@ export const sv = {
   tile_takes: 'Mina tagningar',
   tile_takes_text: 'Se hur du utvecklas',
   soon: 'Snart',
+
+  // En replik, fem sätt, monologer och improvisation
+  fiveways_title: 'En replik, fem sätt',
+  fiveways_situation: 'Säg samma replik fem gånger, på ett nytt sätt varje gång. Gör en kort paus mellan gångerna, så markeras nästa sätt. Du kan också trycka på Nästa.',
+  monologue_title: 'Monolog',
+  monologue_text: 'Välj en monolog. Gör en kort paus mellan styckena, så markeras nästa stycke.',
+  improv_title: 'Improvisera med AI',
+  improv_text: 'Välj en situation. AI:n spelar den andra personen, och det finns inget manus.',
+  improv_unavailable: 'AI-motspelaren är inte igång än. Prova en scen med manus så länge.',
+  pick_back: 'Till hem',
+  record_goal: 'Du vill: {vill}',
+  guided_done: 'Klart. Tryck på Stoppa när du vill.',
   nav_label: 'Huvudmeny',
   nav_home: 'Hem',
   nav_scenes: 'Scener',

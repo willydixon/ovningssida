@@ -1,7 +1,7 @@
 // Tester för Plus: licenskoden, Stripe-anropen, köpet, kontrollen, kundsidan och ångerknappen.
 // Stripe ersätts av en låtsas-Stripe, så inga riktiga anrop görs. Körs med: node tests/plus.mjs
 
-import { formParams, signToken, readToken, tokenFor, bearer, PRICE, licenseSecret, resetSecretCache } from '../netlify/lib/plus.mjs';
+import { formParams, signToken, readToken, tokenFor, bearer, PRICE, licenseSecret, resetSecretCache, makeRestoreCode, normalizeCode, formatCode, codeHash } from '../netlify/lib/plus.mjs';
 import { handle, resetCache } from '../netlify/functions/plus.mjs';
 
 const failures = [];
@@ -34,12 +34,25 @@ const ending = readToken(tokenFor({ id: 'sub_1', customer: 'cus_1', start_date: 
 check(ending.exp === now + 600, 'Licenskoden gäller aldrig längre än den betalda perioden');
 check(bearer(new Request('https://x.se', { headers: { authorization: 'Bearer abc' } })) === 'abc', 'Licenskoden läses från Authorization');
 
+// ---- Återställningskoden ----
+const sample = makeRestoreCode();
+check(/^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/.test(sample), `Återställningskoden har 16 tecken i fyra grupper, utan I, L, O och U (${sample})`);
+check(makeRestoreCode(Buffer.alloc(10, 0)) === '0000-0000-0000-0000' && makeRestoreCode(Buffer.alloc(10, 255)) === 'ZZZZ-ZZZZ-ZZZZ-ZZZZ', 'Koden räknas rätt från de slumpade bitarna');
+check(new Set(Array.from({ length: 200 }, () => makeRestoreCode())).size === 200, 'Varje kod är unik');
+check(normalizeCode(' abcd efgh-jkmn pqrs ') === 'ABCDEFGHJKMNPQRS' && normalizeCode('ABCD-EFGH-JKMN-PQRS') === 'ABCDEFGHJKMNPQRS', 'Små bokstäver, mellanslag och streck spelar ingen roll');
+check(normalizeCode('0O1I-L000-0000-0000') === '0011100000000000', 'O läses som 0, och I och L som 1');
+check(normalizeCode('ABCD-EFGH-JKMN') === null && normalizeCode('ABCD-EFGH-JKMN-PQRU') === null && normalizeCode('') === null && normalizeCode(null) === null, 'För kort, U eller tomt är ingen kod');
+check(formatCode('ABCDEFGHJKMNPQRS') === 'ABCD-EFGH-JKMN-PQRS' && codeHash('ABCDEFGHJKMNPQRS') === codeHash(normalizeCode('abcd-efgh-jkmn-pqrs')) && /^[0-9a-f]{64}$/.test(codeHash('ABCDEFGHJKMNPQRS')),
+  'Kontrollvärdet är detsamma hur koden än skrivs');
+
 // ---- Låtsas-Stripe ----
-function fakeStripe({ prices = [], sessionStatus = 'complete', subStatus = 'active', startDaysAgo = 2, portalConfigs = [], fail = false, missingSub = false } = {}) {
+function fakeStripe({ prices = [], sessionStatus = 'complete', subStatus = 'active', startDaysAgo = 2, portalConfigs = [], fail = false, missingSub = false, kod = null } = {}) {
   const calls = [];
+  // kod = kontrollvärdet för återställningskoden som Stripe har sparat på prenumerationen.
   const sub = () => ({
     id: 'sub_1', object: 'subscription', customer: 'cus_1', status: subStatus,
-    start_date: now - startDaysAgo * 86400, current_period_end: now + 20 * 86400
+    start_date: now - startDaysAgo * 86400, current_period_end: now + 20 * 86400,
+    metadata: kod ? { app: 'ovningssida', kod } : { app: 'ovningssida' }
   });
   const fetchImpl = async (url, init = {}) => {
     const u = new URL(url);
@@ -55,7 +68,13 @@ function fakeStripe({ prices = [], sessionStatus = 'complete', subStatus = 'acti
       case 'POST /checkout/sessions': return Response.json({ id: 'cs_test_abc', url: 'https://checkout.stripe.com/c/pay/cs_test_abc' });
       case 'GET /checkout/sessions/cs_test_abc': return Response.json({ id: 'cs_test_abc', status: sessionStatus, subscription: sub() });
       case 'GET /subscriptions/sub_1': return missingSub ? Response.json({ error: { code: 'resource_missing' } }, { status: 404 }) : Response.json(sub());
-      case 'POST /subscriptions/sub_1': return Response.json(sub());
+      case 'POST /subscriptions/sub_1':
+        if (params.get('metadata[kod]')) kod = params.get('metadata[kod]');
+        return Response.json(sub());
+      case 'GET /subscriptions/search': {
+        const wanted = (params.get('query') || '').match(/^metadata\['kod'\]:'([0-9a-f]{64})'$/);
+        return Response.json({ object: 'search_result', data: wanted && kod === wanted[1] ? [sub()] : [] });
+      }
       case 'DELETE /subscriptions/sub_1': return Response.json({ ...sub(), status: 'canceled' });
       case 'GET /invoices': return Response.json({ data: [{ id: 'in_1', status: 'paid', amount_paid: 9900, payment_intent: 'pi_1' }] });
       case 'POST /refunds': return Response.json({ id: 're_1', status: 'succeeded' });
@@ -65,7 +84,7 @@ function fakeStripe({ prices = [], sessionStatus = 'complete', subStatus = 'acti
       default: return Response.json({ error: { code: 'okand' } }, { status: 404 });
     }
   };
-  return { fetchImpl, calls, find: (method, path) => calls.filter((c) => c.method === method && c.path === path) };
+  return { fetchImpl, calls, find: (method, path) => calls.filter((c) => c.method === method && c.path === path), stored: () => kod };
 }
 function memoryStore() {
   const data = new Map();
@@ -163,6 +182,12 @@ data = await res.json();
 const license = readToken(data.token, SECRET);
 check(res.status === 200 && data.plan === 'plus' && license && license.sub === 'sub_1' && license.cus === 'cus_1', 'Ett betalt köp ger en licenskod för prenumerationen');
 check(data.usedSeconds === 0 && data.limitSeconds === 3600, 'Plus börjar med 60 AI-minuter');
+const firstCode = data.code;
+check(!!normalizeCode(firstCode) && stripe.stored() === codeHash(normalizeCode(firstCode)), 'Efter köpet får man en återställningskod, och Stripe får bara kontrollvärdet');
+check(!stripe.calls.some((c) => [...c.params.values()].some((v) => v.includes(normalizeCode(firstCode)) || v.includes(firstCode))), 'Själva koden skickas aldrig till Stripe');
+const again = fakeStripe({ kod: 'a'.repeat(64) });
+res = await handle(req('activate?session_id=cs_test_abc'), ENV, again.fetchImpl, store);
+check((await res.json()).code === null && again.find('POST', '/subscriptions/sub_1').length === 0, 'Ett köp som redan har en kod får ingen ny när det kontrolleras igen');
 check(stripe.find('GET', '/checkout/sessions/cs_test_abc')[0].params.get('expand[]') === 'subscription', 'Prenumerationen hämtas med köpet');
 
 // ---- Kontrollen ----
@@ -208,6 +233,30 @@ check(stripe.find('POST', '/billing_portal/configurations').length === 0 && stri
   'Inställningarna för kundsidan skapas bara en gång');
 res = await handle(req('portal', { method: 'POST' }), ENV, fakeStripe().fetchImpl, store);
 check(res.status === 401, 'Utan licenskod får man ingen länk till kundsidan');
+
+// ---- Återställ Plus ----
+let restore = fakeStripe({ kod: codeHash(normalizeCode(firstCode)) });
+res = await handle(req('aterstall', { method: 'POST', body: { kod: firstCode.toLowerCase().replace(/-/g, ' ') } }), ENV, restore.fetchImpl, store);
+let restored = await res.json();
+check(res.status === 200 && restored.plan === 'plus' && readToken(restored.token, SECRET)?.sub === 'sub_1', 'Med koden får man tillbaka Plus, även med små bokstäver och mellanslag');
+check(restore.find('GET', '/subscriptions/search')[0].params.get('query') === `metadata['kod']:'${codeHash(normalizeCode(firstCode))}'`, 'Prenumerationen letas upp på kontrollvärdet');
+res = await handle(req('aterstall', { method: 'POST', body: { kod: makeRestoreCode() } }), ENV, restore.fetchImpl, store);
+check(res.status === 404 && (await res.json()).error === 'not_found', 'En kod som inte finns ger inget Plus');
+res = await handle(req('aterstall', { method: 'POST', body: { kod: 'hej' } }), ENV, fakeStripe().fetchImpl, store);
+check(res.status === 400 && (await res.json()).error === 'bad_code', 'Något som inte är en kod avvisas utan att fråga Stripe');
+restore = fakeStripe({ kod: codeHash(normalizeCode(firstCode)), subStatus: 'canceled' });
+res = await handle(req('aterstall', { method: 'POST', body: { kod: firstCode } }), ENV, restore.fetchImpl, store);
+check(res.status === 404, 'Ett avslutat Plus går inte att återställa');
+
+// En ny kod ersätter den gamla.
+const renew = fakeStripe({ kod: codeHash(normalizeCode(firstCode)) });
+res = await handle(req('kod', { method: 'POST', token: data.token }), ENV, renew.fetchImpl, store);
+const newCode = (await res.json()).code;
+check(!!normalizeCode(newCode) && newCode !== firstCode && renew.stored() === codeHash(normalizeCode(newCode)), 'Man kan skapa en ny kod, och då sparas den nya');
+res = await handle(req('aterstall', { method: 'POST', body: { kod: firstCode } }), ENV, renew.fetchImpl, store);
+check(res.status === 404, 'Den gamla koden slutar fungera när en ny skapas');
+res = await handle(req('kod', { method: 'POST' }), ENV, fakeStripe().fetchImpl, store);
+check(res.status === 401, 'En ny kod kräver licenskoden');
 
 // ---- Ångerknappen ----
 res = await handle(req('angra', { method: 'POST', token: data.token, body: { namn: 'Kim', bekraftat: false } }), ENV, fakeStripe().fetchImpl, store);

@@ -762,7 +762,14 @@ try {
       case '/api/plus/checkout':
         return route.fulfill({ json: { url: `${BASE}/index.html?plus=klar&session_id=cs_test_abc123` } });
       case '/api/plus/activate':
-        return route.fulfill({ json: { plan: 'plus', token: plusToken, usedSeconds: 0, limitSeconds: 3600 } });
+        return route.fulfill({ json: { plan: 'plus', token: plusToken, code: 'K7Q2-M9XD-4RTA-B3CE', usedSeconds: 0, limitSeconds: 3600 } });
+      case '/api/plus/kod':
+        return route.fulfill({ json: { code: 'N8WS-2HJF-6PZE-Y1AV' } });
+      case '/api/plus/aterstall': {
+        const kod = JSON.parse(call.body || '{}').kod;
+        if (kod === 'N8WS-2HJF-6PZE-Y1AV') return route.fulfill({ json: { plan: 'plus', token: plusToken, usedSeconds: 600, limitSeconds: 3600 } });
+        return route.fulfill({ status: 404, json: { error: 'not_found' } });
+      }
       case '/api/plus/status':
         return route.fulfill({ json: { plan: 'plus', token: plusToken, usedSeconds: api.used, limitSeconds: 3600 } });
       case '/api/plus/portal':
@@ -779,6 +786,9 @@ try {
   p10.on('console', (m) => { if (m.type() === 'error') p10errors.push(m.text()); });
   p10.on('pageerror', (e) => p10errors.push(String(e)));
   p10.on('request', (r) => p10requests.push({ url: r.url(), method: r.method() }));
+  // En fel återställningskod ska ge 404, och det loggar webbläsaren som ett fel. Det felet är väntat.
+  let expected404 = 0;
+  p10.on('response', (r) => { if (r.status() === 404 && r.url().endsWith('/api/plus/aterstall')) expected404 += 1; });
   let plusInit = null;
   let plusSocket = null;
   await p10.routeWebSocket(/elevenlabs\.io/, (ws) => {
@@ -813,6 +823,17 @@ try {
     'Plus: efter köpet välkomnas man och köpknappen byts mot hantering');
   check((await p10.locator('#plus-minutes').innerText()) === 'Du har 60 av 60 AI-minuter kvar den här månaden.', 'Plus: 60 AI-minuter finns');
   check((await storage('plus-licens')) === plusToken && !p10.url().includes('session_id'), 'Plus: licenskoden sparas i mobilen och köpnumret tas bort ur adressen');
+  check((await p10.locator('#plus-code-value').innerText()) === 'K7Q2-M9XD-4RTA-B3CE' && (await storage('plus-kod')) === 'K7Q2-M9XD-4RTA-B3CE' && await p10.locator('#plus-code-copy').isVisible(),
+    'Återställning: efter köpet visas återställningskoden, och den sparas i mobilen');
+  await p10ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
+  await p10.locator('#plus-code-copy').click();
+  await p10.locator('#plus-code-status').filter({ hasText: 'kopierad' }).waitFor({ timeout: 3000 }).catch(() => {});
+  check((await p10.evaluate(() => navigator.clipboard.readText())) === 'K7Q2-M9XD-4RTA-B3CE' && (await p10.locator('#plus-code-status').innerText()).startsWith('Koden är kopierad'), 'Återställning: koden kan kopieras');
+  await p10.locator('#plus-code-new').click();
+  await p10.locator('#plus-code-value').filter({ hasText: 'N8WS' }).waitFor({ timeout: 3000 }).catch(() => {});
+  const newCodeCall = callsTo('/api/plus/kod')[0];
+  check(newCodeCall && newCodeCall.method === 'POST' && newCodeCall.auth === `Bearer ${plusToken}` && (await p10.locator('#plus-code-value').innerText()) === 'N8WS-2HJF-6PZE-Y1AV' &&
+    (await storage('plus-kod')) === 'N8WS-2HJF-6PZE-Y1AV' && (await p10.locator('#plus-code-status').innerText()).includes('gamla fungerar inte'), 'Återställning: man kan skapa en ny kod, och då sägs det att den gamla slutar fungera');
 
   // Plus ger längre tagningar och den bättre AI-motspelaren.
   check(await p10.locator('#tabbar').isVisible(), 'Plus: menyn längst ned finns kvar på Plus-sidan');
@@ -871,9 +892,33 @@ try {
   check(withdrawCall && withdrawCall.auth === `Bearer ${plusToken}` && JSON.parse(withdrawCall.body).namn === 'Kim Test' && JSON.parse(withdrawCall.body).bekraftat === true,
     'Ånger: namnet och bekräftelsen skickas med licenskoden');
   check((await p10.locator('#angra-result').innerText()).startsWith('Köpet är ångrat. Vi tog emot din ånger') && await p10.locator('#angra-form').isHidden(), 'Ånger: bekräftelsen visar när ångern togs emot');
-  check((await storage('plus-licens')) === null, 'Ånger: Plus tas bort från mobilen');
+  check((await storage('plus-licens')) === null && (await storage('plus-kod')) === null, 'Ånger: Plus och återställningskoden tas bort från mobilen');
   await p10.locator('[data-screen="angra"] [data-action="to-start"]').click();
   check((await p10.locator('#plus-banner-text').innerText()).includes('60 AI-minuter i månaden'), 'Ånger: hemskärmen visar gratis igen');
+
+  // Återställ Plus på en "ny mobil": ingen licenskod och ingen kod i mobilen.
+  await p10.evaluate(() => localStorage.clear());
+  await p10.goto(`${BASE}/index.html?angra=1`);
+  await p10.locator('#angra-none').waitFor({ state: 'visible', timeout: 5000 });
+  check(/återställningskod/.test(await p10.locator('#angra-none').innerText()), 'Återställning: ångerknappen hänvisar till koden när mobilen saknar Plus');
+  await p10.locator('#angra-none [data-action="plus-restore-open"]').click();
+  await p10.locator('#plus-restore').waitFor({ state: 'visible', timeout: 3000 });
+  check(await p10.locator('#plus-restore-code').evaluate((el) => document.activeElement === el), 'Återställning: fältet för koden får fokus');
+  await p10.locator('#plus-restore-code').fill('abcd');
+  await p10.locator('#plus-restore-send').click();
+  check((await p10.locator('#plus-restore-status').innerText()).startsWith('Koden har 16 tecken') && !callsTo('/api/plus/aterstall').length, 'Återställning: en för kort kod avvisas direkt i mobilen');
+  await p10.locator('#plus-restore-code').fill('k7q2 m9xd 4rta b3ce');
+  await p10.locator('#plus-restore-send').click();
+  await p10.locator('#plus-restore-status').filter({ hasText: 'Ingen aktiv' }).waitFor({ timeout: 3000 }).catch(() => {});
+  check((await p10.locator('#plus-restore-status').innerText()).startsWith('Ingen aktiv Plus har den koden') && JSON.parse(callsTo('/api/plus/aterstall')[0].body).kod === 'K7Q2-M9XD-4RTA-B3CE',
+    'Återställning: en gammal kod fungerar inte, och koden skickas skriven på samma sätt hur den än skrevs in');
+  await p10.locator('#plus-restore-code').fill('N8WS-2HJF-6PZE-Y1AV');
+  await p10.locator('#plus-restore-code').press('Enter');
+  await p10.locator('#plus-message').filter({ hasText: 'tillbaka' }).waitFor({ timeout: 5000 }).catch(() => {});
+  check((await p10.locator('#plus-message').innerText()) === 'Plus är tillbaka på den här mobilen.' && await p10.locator('#plus-have').isVisible() &&
+    (await storage('plus-licens')) === plusToken && (await storage('plus-kod')) === 'N8WS-2HJF-6PZE-Y1AV', 'Återställning: med rätt kod är Plus tillbaka, med koden sparad igen');
+  check((await p10.locator('#plus-minutes').innerText()) === 'Du har 50 av 60 AI-minuter kvar den här månaden.', 'Återställning: minuterna som redan har använts följer med');
+  await p10.evaluate(() => localStorage.clear());
 
   // Avbrutet köp och köp som inte är igång.
   await p10.goto(`${BASE}/index.html?plus=avbrutet`);
@@ -931,9 +976,13 @@ try {
   check((await p10.locator('#rec-max').innerText()) === '3:00', 'Gratis: en tagning kan vara upp till 3 minuter');
 
   const p10odd = p10requests.filter((r) => !(r.url.startsWith(BASE) || r.url.startsWith('blob:')) ||
-    (r.method !== 'GET' && !/\/api\/(ai-end|plus\/(checkout|portal|angra))$/.test(new URL(r.url).pathname)));
+    (r.method !== 'GET' && !/\/api\/(ai-end|plus\/(checkout|portal|angra|kod|aterstall))$/.test(new URL(r.url).pathname)));
   check(p10odd.length === 0, `Plus: bara köpet, kundsidan, ångern och AI-tiden skickas (${p10odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
-  check(p10errors.length === 0, `Inga fel med Plus (${p10errors.join(' | ') || 'inga'})`);
+  const p10unexpected = p10errors.filter((e) => {
+    if (expected404 > 0 && /status of 404/.test(e)) { expected404 -= 1; return false; }
+    return true;
+  });
+  check(p10unexpected.length === 0, `Inga fel med Plus (${p10unexpected.join(' | ') || 'inga'})`);
   await p10ctx.close();
 
   // ---- 11. Mina tagningar ----

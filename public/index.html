@@ -277,12 +277,27 @@
     <p class="kicker"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg>Plus</p>
     <h1 id="h-plus" tabindex="-1">Mer AI och mer tid</h1>
     <p class="notice" id="plus-message" aria-live="polite" hidden></p>
+    <div class="notice" id="plus-unsaved" hidden>
+      <p>Du har en tagning som inte är sparad. Spara den innan du köper Plus, annars försvinner den när betalsidan öppnas.</p>
+      <button type="button" class="secondary" data-action="to-save">Tillbaka till tagningen</button>
+    </div>
     <p class="test-badge" id="plus-test" hidden>Testläge: inga riktiga pengar dras. Betala med testkortet 4242 4242 4242 4242, ett datum framåt i tiden och valfri kod.</p>
     <div id="plus-have" hidden>
       <p class="lead" id="plus-minutes"></p>
       <div class="row">
         <button type="button" class="secondary" data-action="plus-portal">Ändra kort eller säg upp</button>
         <button type="button" class="ghost" data-action="to-angra">Ångra köpet</button>
+      </div>
+      <div class="restore-box" id="plus-code">
+        <h2>Din återställningskod</h2>
+        <p class="small">Med koden får du tillbaka Plus om du byter mobil eller rensar webbläsaren. Spara den, till exempel som en skärmbild, och visa den inte för någon annan.</p>
+        <p class="restore-code" id="plus-code-value" hidden></p>
+        <p class="small" id="plus-code-missing" hidden>Koden finns inte på den här mobilen. Skapa en ny kod och spara den.</p>
+        <div class="row">
+          <button type="button" class="secondary" data-action="plus-code-copy" id="plus-code-copy" hidden>Kopiera koden</button>
+          <button type="button" class="ghost" data-action="plus-code-new" id="plus-code-new">Skapa en ny kod</button>
+        </div>
+        <p class="small" id="plus-code-status" aria-live="polite">När du skapar en ny kod slutar den gamla att fungera.</p>
       </div>
     </div>
     <div class="compare">
@@ -310,6 +325,13 @@
     <div id="plus-buy">
       <button type="button" class="primary" data-action="plus-buy" id="plus-buy-btn">Skaffa Plus för 99 kr i månaden</button>
       <p class="small">Priset är inklusive moms. Ingen bindningstid, och du kan säga upp när du vill. Du har 14 dagars ångerrätt. Betalningen sköts av Stripe. <a href="kopvillkor.html">Köpvillkor</a></p>
+      <button type="button" class="ghost" data-action="plus-restore-open" id="plus-restore-open">Har du redan Plus? Återställ det här</button>
+      <form class="restore-box" id="plus-restore" hidden>
+        <label for="plus-restore-code">Din återställningskod</label>
+        <input id="plus-restore-code" name="kod" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX">
+        <button type="submit" class="primary" id="plus-restore-send">Återställ Plus</button>
+        <p class="small" id="plus-restore-status" aria-live="polite"></p>
+      </form>
     </div>
     <p class="notice" id="plus-unavailable" hidden>Köp är inte igång än. Plus kommer snart.</p>
   </section>
@@ -325,7 +347,10 @@
       <button type="button" class="danger" data-action="angra-send" id="angra-send" disabled>Ångra köpet</button>
     </div>
     <p class="notice" id="angra-result" aria-live="polite" hidden></p>
-    <p class="notice" id="angra-none" hidden>Den här mobilen har inget köp av Plus. Har du köpt på en annan mobil, öppna appen där eller hör av dig via Kontakt.</p>
+    <div id="angra-none" hidden>
+      <p class="notice">Den här mobilen har inget köp av Plus. Har du din återställningskod kan du först återställa Plus här och sedan ångra. Annars kan du öppna appen på mobilen där du köpte Plus, eller höra av dig via Kontakt.</p>
+      <button type="button" class="secondary" data-action="plus-restore-open">Återställ Plus med din kod</button>
+    </div>
     <button type="button" class="ghost" data-action="to-start">Till hem</button>
   </section>
 

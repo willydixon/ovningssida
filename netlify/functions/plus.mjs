@@ -11,7 +11,7 @@
 import { getStore } from '@netlify/blobs';
 import {
   PLAN, PRICE, WITHDRAWAL_DAYS, json, stripe, isTestKey, readToken, bearer, tokenFor, activeStatus,
-  readSeconds, monthKey, licenseSecret
+  readSeconds, monthKey, licenseSecret, makeRestoreCode, normalizeCode, codeHash
 } from '../lib/plus.mjs';
 
 // Sidan som köpet och Stripes kundsida går tillbaka till, och texten vid köpknappen, per språk.
@@ -78,6 +78,13 @@ async function portalConfig(f, key) {
   return cachedPortal;
 }
 
+// Skapar en ny återställningskod och sparar dess kontrollvärde på prenumerationen hos Stripe.
+async function newRestoreCode(f, key, subId) {
+  const code = makeRestoreCode();
+  await stripe(f, key, 'POST', `/subscriptions/${encodeURIComponent(subId)}`, { metadata: { kod: codeHash(normalizeCode(code)) } });
+  return code;
+}
+
 // En prenumeration som inte finns hos Stripe (till exempel efter att testdata rensats) räknas som ingen.
 async function subscription(f, key, id) {
   try {
@@ -127,6 +134,26 @@ export async function handle(request, env = process.env, f = fetch, store = null
       const session = await stripe(f, key, 'GET', `/checkout/sessions/${id}`, { expand: ['subscription'] });
       const sub = session.subscription;
       if (session.status !== 'complete' || !sub || typeof sub !== 'object' || !activeStatus(sub)) return json({ error: 'not_paid' }, 402);
+      // Första gången får köpet en återställningskod. Den visas bara nu, och sedan på mobilen.
+      let code = null;
+      if (!(sub.metadata && sub.metadata.kod)) {
+        code = await newRestoreCode(f, key, sub.id);
+      }
+      return json({ plan: 'plus', token: tokenFor(sub, secret), code, ...(await minutes(blobs(), sub.id)) });
+    }
+
+    // Återställ Plus med koden, utan licenskod. Stripes sökning kan ta upp till en minut på sig
+    // att hitta en ny kod.
+    if (route === 'aterstall' && request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const normalized = normalizeCode(body && body.kod);
+      if (!normalized) return json({ error: 'bad_code' }, 400);
+      const found = await stripe(f, key, 'GET', '/subscriptions/search', {
+        query: `metadata['kod']:'${codeHash(normalized)}'`,
+        limit: 10
+      });
+      const sub = (found.data || []).find(activeStatus);
+      if (!sub) return json({ error: 'not_found' }, 404);
       return json({ plan: 'plus', token: tokenFor(sub, secret), ...(await minutes(blobs(), sub.id)) });
     }
 
@@ -141,6 +168,11 @@ export async function handle(request, env = process.env, f = fetch, store = null
         token = tokenFor(sub, secret);
       }
       return json({ plan: 'plus', token, ...(await minutes(blobs(), payload.sub)) });
+    }
+
+    // En ny återställningskod. Den gamla slutar då att fungera.
+    if (route === 'kod' && request.method === 'POST') {
+      return json({ code: await newRestoreCode(f, key, payload.sub) });
     }
 
     if (route === 'portal' && request.method === 'POST') {

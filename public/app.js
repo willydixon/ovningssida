@@ -1555,7 +1555,7 @@ async function retryCamera() {
 // Köpet sker hos Stripe. Efteråt får mobilen en licenskod som visar att man har Plus.
 // Koden och gratisminuterna sparas i mobilens lagring, och inget annat.
 
-const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder' };
+const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder', code: 'plus-kod' };
 
 function storageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -1588,6 +1588,7 @@ function setPlan(data) {
     state.license = data.token;
     state.plusUsed = Number(data.usedSeconds) || 0;
     storageSet(STORE.license, data.token);
+    if (data.code) storageSet(STORE.code, data.code); // återställningskoden, som bara visas efter köpet
   } else {
     state.plan = 'gratis';
     state.license = null;
@@ -1636,13 +1637,39 @@ function renderPlanBits() {
   $('#record-max-note').textContent = t('record_max_note', { n: max / 60 });
 }
 
-async function showPlus(message = '') {
+// Återställningskoden som användaren skriver, på samma sätt som servern läser den:
+// utan mellanslag och streck, I och L som 1 och O som 0. Annat än 16 tecken ger null.
+function cleanCode(input) {
+  const s = String(input || '').toUpperCase().replace(/[\s-]/g, '').replace(/[IL]/g, '1').replace(/O/g, '0');
+  return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(s) ? s.match(/.{4}/g).join('-') : null;
+}
+
+function renderRestoreCode(status = '') {
+  const code = storageGet(STORE.code);
+  $('#plus-code-value').textContent = code || '';
+  $('#plus-code-value').hidden = !code;
+  $('#plus-code-copy').hidden = !code;
+  $('#plus-code-missing').hidden = !!code;
+  $('#plus-code-status').textContent = status || t('plus_code_new_note');
+}
+
+async function showPlus(message = '', { restore = false } = {}) {
   const msg = $('#plus-message');
   msg.textContent = message;
   msg.hidden = !message;
   const plus = state.plan === 'plus';
   $('#plus-have').hidden = !plus;
   $('#plus-buy').hidden = plus;
+  // En tagning som inte är sparad försvinner när Stripes betalsida öppnas.
+  $('#plus-unsaved').hidden = plus || !(state.blob && !state.savedTakeId);
+  renderRestoreCode();
+  // En sparad kod på mobilen men inget Plus (till exempel om licenskoden slutat gälla): fyll i den.
+  const saved = storageGet(STORE.code);
+  const openRestore = !plus && (restore || !!saved);
+  $('#plus-restore').hidden = !openRestore;
+  $('#plus-restore-open').hidden = openRestore;
+  if (openRestore && saved && !$('#plus-restore-code').value) $('#plus-restore-code').value = saved;
+  $('#plus-restore-status').textContent = '';
   $('#plus-minutes').textContent = t('plus_minutes', { left: minutesText(plusLeft()), limit: PLANS.plus.aiSeconds / 60 });
   show('plus');
   if (!state.plusInfo) {
@@ -1657,6 +1684,58 @@ async function showPlus(message = '') {
   $('#plus-test').hidden = !(available && state.plusInfo.test);
   $('#plus-unavailable').hidden = available || plus;
   $('#plus-buy-btn').disabled = !available;
+}
+
+async function copyRestoreCode() {
+  const code = storageGet(STORE.code);
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    renderRestoreCode(t('plus_code_copied'));
+  } catch {
+    renderRestoreCode(t('plus_code_copy_failed'));
+  }
+}
+
+async function newRestoreCode() {
+  const button = $('#plus-code-new');
+  button.disabled = true;
+  try {
+    const { ok, data } = await api('/api/plus/kod', { method: 'POST' });
+    if (ok && data.code) {
+      storageSet(STORE.code, data.code);
+      renderRestoreCode(t('plus_code_made'));
+      return;
+    }
+  } catch { /* visas nedan */ } finally {
+    button.disabled = false;
+  }
+  renderRestoreCode(t('plus_code_failed'));
+}
+
+async function restorePlus() {
+  const status = $('#plus-restore-status');
+  const code = cleanCode($('#plus-restore-code').value);
+  if (!code) {
+    status.textContent = t('plus_restore_bad');
+    return;
+  }
+  const button = $('#plus-restore-send');
+  button.disabled = true;
+  try {
+    const res = await api('/api/plus/aterstall', { method: 'POST', body: { kod: code } });
+    if (res.ok && res.data.plan === 'plus') {
+      setPlan({ ...res.data, code });
+      $('#plus-restore-code').value = '';
+      await showPlus(t('plus_restored'));
+      return;
+    }
+    status.textContent = t(res.status === 404 ? 'plus_restore_not_found' : res.status === 400 ? 'plus_restore_bad' : 'plus_restore_failed');
+  } catch {
+    status.textContent = t('plus_restore_failed');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function buyPlus() {
@@ -1746,9 +1825,11 @@ async function sendWithdraw() {
       if (data.status === 'angrat') {
         result.textContent = t('angra_done', { time });
         setPlan(null);
+        storageSet(STORE.code, null); // köpet finns inte längre, så koden behövs inte
       } else if (data.status === 'redan_avslutad') {
         result.textContent = t('angra_already');
         setPlan(null);
+        storageSet(STORE.code, null);
       } else {
         result.textContent = t('angra_cancelled', { time, date: new Date(data.ends * 1000).toLocaleDateString(t('locale_code')) });
       }
@@ -1785,7 +1866,13 @@ document.addEventListener('click', (event) => {
     case 'fiveways': requireAdult(() => startExercise(fiveWaysScene(youTexts()))); break;
     case 'monologue': requireAdult(pickMonologue); break;
     case 'improv': requireAdult(pickImprov); break;
-    case 'to-plus': stopCamera(); clearTake(); showPlus(); break;
+    case 'to-plus': stopCamera(); showPlus(); break; // en tagning som inte är sparad finns kvar
+    case 'plus-code-copy': copyRestoreCode(); break;
+    case 'plus-code-new': newRestoreCode(); break;
+    case 'plus-restore-open':
+      stopCamera();
+      showPlus('', { restore: true }).then(() => $('#plus-restore-code').focus());
+      break;
     case 'plus-buy': buyPlus(); break;
     case 'plus-portal': openPortal(); break;
     case 'to-angra': showWithdraw(); break;
@@ -1817,6 +1904,11 @@ document.addEventListener('click', (event) => {
     case 'retry-camera': retryCamera(); break;
     default: break;
   }
+});
+
+$('#plus-restore').addEventListener('submit', (event) => {
+  event.preventDefault();
+  restorePlus();
 });
 
 document.addEventListener('visibilitychange', () => {

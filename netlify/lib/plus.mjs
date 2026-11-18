@@ -10,7 +10,7 @@
 // Ingen video eller ljud passerar här. Hos Stripe finns kundens betaluppgifter, och här
 // sparas bara prenumerationens nummer och hur många AI-sekunder som har använts.
 
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const PLAN = {
   plus: { aiSeconds: 3600, takeSeconds: 600 }, // 60 AI-minuter i månaden, tagningar upp till 10 minuter
@@ -139,6 +139,38 @@ export function tokenFor(sub, secret, now = new Date()) {
 }
 
 export const activeStatus = (sub) => !!sub && ['active', 'trialing'].includes(sub.status);
+
+// ---- Återställningskoden ----
+// Med koden får man tillbaka Plus på en ny mobil eller efter att webbläsaren har rensats.
+// 16 tecken i Crockfords base32 (inga I, L, O eller U, som lätt förväxlas), i fyra grupper,
+// alltså 80 slumpade bitar. Hos Stripe sparas bara ett kontrollvärde (sha-256) av koden.
+const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+export function makeRestoreCode(bytes = randomBytes(10)) {
+  let out = '';
+  let value = 0;
+  let bits = 0;
+  for (const byte of bytes) {
+    value = ((value << 8) | byte) >>> 0;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += CODE_ALPHABET[(value >>> bits) & 31];
+    }
+    value &= (1 << bits) - 1;
+  }
+  return out.slice(0, 16).match(/.{4}/g).join('-');
+}
+
+// Det användaren skriver, med små bokstäver, mellanslag och streck, blir koden utan streck.
+// I och L läses som 1 och O som 0, som i Crockfords base32. Annat än 16 tecken ger null.
+export function normalizeCode(input) {
+  const s = String(input || '').toUpperCase().replace(/[\s-]/g, '').replace(/[IL]/g, '1').replace(/O/g, '0');
+  return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(s) ? s : null;
+}
+
+export const formatCode = (normalized) => normalized.match(/.{4}/g).join('-');
+export const codeHash = (normalized) => createHash('sha256').update(`ovningssida-plus:${normalized}`).digest('hex');
 
 // ---- AI-minuterna ----
 // Räknas i Netlify Blobs: plus/<prenumeration>/<månad> och gratis/<dygn> har använda sekunder.

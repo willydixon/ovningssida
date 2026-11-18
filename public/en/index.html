@@ -277,12 +277,27 @@
     <p class="kicker"><svg aria-hidden="true" focusable="false" class="ic lucide lucide-sparkles" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" > <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg>Plus</p>
     <h1 id="h-plus" tabindex="-1">More AI and more time</h1>
     <p class="notice" id="plus-message" aria-live="polite" hidden></p>
+    <div class="notice" id="plus-unsaved" hidden>
+      <p>You have a take that is not saved. Save it before you buy Plus, or it disappears when the payment page opens.</p>
+      <button type="button" class="secondary" data-action="to-save">Back to the take</button>
+    </div>
     <p class="test-badge" id="plus-test" hidden>Test mode: no real money is charged. Pay with the test card 4242 4242 4242 4242, any future date and any code.</p>
     <div id="plus-have" hidden>
       <p class="lead" id="plus-minutes"></p>
       <div class="row">
         <button type="button" class="secondary" data-action="plus-portal">Change card or cancel</button>
         <button type="button" class="ghost" data-action="to-angra">Withdraw from purchase</button>
+      </div>
+      <div class="restore-box" id="plus-code">
+        <h2>Your restore code</h2>
+        <p class="small">With the code you get Plus back if you change phones or clear your browser. Save it, for example as a screenshot, and do not show it to anyone else.</p>
+        <p class="restore-code" id="plus-code-value" hidden></p>
+        <p class="small" id="plus-code-missing" hidden>The code is not on this phone. Create a new code and save it.</p>
+        <div class="row">
+          <button type="button" class="secondary" data-action="plus-code-copy" id="plus-code-copy" hidden>Copy the code</button>
+          <button type="button" class="ghost" data-action="plus-code-new" id="plus-code-new">Create a new code</button>
+        </div>
+        <p class="small" id="plus-code-status" aria-live="polite">When you create a new code, the old one stops working.</p>
       </div>
     </div>
     <div class="compare">
@@ -310,6 +325,13 @@
     <div id="plus-buy">
       <button type="button" class="primary" data-action="plus-buy" id="plus-buy-btn">Get Plus for 99 SEK a month</button>
       <p class="small">The price includes VAT. No commitment, and you can cancel whenever you like. You have a 14-day right of withdrawal. Payments are handled by Stripe. <a href="kopvillkor.html">Terms of purchase</a></p>
+      <button type="button" class="ghost" data-action="plus-restore-open" id="plus-restore-open">Already have Plus? Restore it here</button>
+      <form class="restore-box" id="plus-restore" hidden>
+        <label for="plus-restore-code">Your restore code</label>
+        <input id="plus-restore-code" name="kod" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="24" placeholder="XXXX-XXXX-XXXX-XXXX">
+        <button type="submit" class="primary" id="plus-restore-send">Restore Plus</button>
+        <p class="small" id="plus-restore-status" aria-live="polite"></p>
+      </form>
     </div>
     <p class="notice" id="plus-unavailable" hidden>Purchases are not open yet. Plus is coming soon.</p>
   </section>
@@ -325,7 +347,10 @@
       <button type="button" class="danger" data-action="angra-send" id="angra-send" disabled>Withdraw from purchase</button>
     </div>
     <p class="notice" id="angra-result" aria-live="polite" hidden></p>
-    <p class="notice" id="angra-none" hidden>This phone has no purchase of Plus. If you bought it on another phone, open the app there or get in touch via Contact.</p>
+    <div id="angra-none" hidden>
+      <p class="notice">This phone has no purchase of Plus. If you have your restore code, you can first restore Plus here and then withdraw. Otherwise, open the app on the phone where you bought Plus, or get in touch via Contact.</p>
+      <button type="button" class="secondary" data-action="plus-restore-open">Restore Plus with your code</button>
+    </div>
     <button type="button" class="ghost" data-action="to-start">Back to home</button>
   </section>
 

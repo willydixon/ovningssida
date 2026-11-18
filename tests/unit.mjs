@@ -59,6 +59,7 @@ for (const s of SCENES) {
   check(typeof s.situation === 'string' && s.situation.length > 0, `${where}: har situation`);
   check(Number.isInteger(s.langd_sekunder) && s.langd_sekunder >= 30 && s.langd_sekunder <= 180, `${where}: längd 30–180 s`);
   check(Array.isArray(s.roller) && s.roller.length === 2, `${where}: två roller`);
+  check(s.roller.every((r) => typeof r.vill === 'string' && r.vill.length > 0 && typeof r.inre === 'string' && r.inre.length > 0), `${where}: varje roll har en vilja och ett inre liv`);
   const roleIds = new Set(s.roller.map((r) => r.id));
   check(Array.isArray(s.repliker) && s.repliker.length >= 6 && s.repliker.every((l) => roleIds.has(l.roll) && l.text.trim()), `${where}: repliker hör till rollerna`);
   // Motspelaren lyssnar efter en replik i taget, så två repliker i rad av samma roll slås ihop till en.

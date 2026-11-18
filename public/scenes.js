@@ -8,7 +8,12 @@ export const SCENES = [
     titel: 'Nyckeln',
     situation: 'Sam och Robin delar lägenhet. Det är sent på kvällen, och nyckeln till cykelförrådet är borta.',
     langd_sekunder: 90,
-    roller: [{ id: 'A', namn: 'Sam' }, { id: 'B', namn: 'Robin' }],
+    // vill: vad rollen vill i scenen, visas för den som spelar rollen.
+    // inre: rollens hemlighet och känsla, används när AI-motspelaren spelar rollen.
+    roller: [
+      { id: 'A', namn: 'Sam', vill: 'Få nyckeln och komma iväg, utan att behöva prata om Alex.', inre: 'Har inte sagt hela sanningen om Alex och skäms lite för det.' },
+      { id: 'B', namn: 'Robin', vill: 'Få Sam att berätta sanningen om Alex innan nyckeln kommer fram.', inre: 'Har nyckeln i jackfickan hela tiden. Är sårad över att Sam ljuger, men vill inte visa det direkt.' }
+    ],
     repliker: [
       { roll: 'A', text: 'Har du sett nyckeln till förrådet? Den låg här i skålen.' },
       { roll: 'B', text: 'Jag har inte rört den. Jag har varit hemma hela dagen.' },
@@ -34,7 +39,10 @@ export const SCENES = [
     titel: 'Intervjun',
     situation: 'Noor söker jobb på ett kafé. Kim intervjuar och har bråttom.',
     langd_sekunder: 75,
-    roller: [{ id: 'A', namn: 'Kim' }, { id: 'B', namn: 'Noor' }],
+    roller: [
+      { id: 'A', namn: 'Kim', vill: 'Hitta någon som klarar stress, på tio minuter.', inre: 'Har två sjuka i personalen och behöver någon desperat, men vill inte visa det.' },
+      { id: 'B', namn: 'Noor', vill: 'Få jobbet, utan att låtsas vara någon annan.', inre: 'Behöver jobbet för att klara hyran. Nervös, men ärlig och lite rolig när hon slappnar av.' }
+    ],
     repliker: [
       { roll: 'A', text: 'Noor? Sätt dig. Jag har tio minuter, så vi kör.' },
       { roll: 'B', text: 'Tack. Jag har mitt cv med mig, om du vill ha det.' },
@@ -60,7 +68,10 @@ export const SCENES = [
     titel: 'Beskedet',
     situation: 'Syskonen Mika och Jo dukar inför mammas födelsedag. Mika har något att berätta.',
     langd_sekunder: 90,
-    roller: [{ id: 'A', namn: 'Mika' }, { id: 'B', namn: 'Jo' }],
+    roller: [
+      { id: 'A', namn: 'Mika', vill: 'Berätta om Oslo för Jo innan mamma kommer, utan att förstöra kvällen.', inre: 'Har redan skrivit på kontraktet och är rädd att Jo ska känna sig lämnad.' },
+      { id: 'B', namn: 'Jo', vill: 'Få reda på vad Mika döljer, och att kvällen blir fin för mamma.', inre: 'Har tagit hand om mamma mest och blir rädd att bli ensam med ansvaret.' }
+    ],
     repliker: [
       { roll: 'A', text: 'Kan du lägga servetterna? Mamma kommer om en kvart.' },
       { roll: 'B', text: 'Du har varit tyst hela dagen. Vad är det?' },

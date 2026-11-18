@@ -39,6 +39,8 @@ check(userFirst.firstMessage === '', 'När din roll börjar scenen väntar AI:n 
 check(userFirst.prompt.includes(`Du spelar ${b.namn}`) && userFirst.prompt.includes(`Skådespelaren spelar ${a.namn}`), 'AI:n spelar den andra rollen');
 check(userFirst.prompt.includes(scene.situation) && userFirst.prompt.includes(scene.repliker[1].text), 'AI:n får situationen och manuset');
 check(/Bryt aldrig scenen/.test(userFirst.prompt) && /bedöma/.test(userFirst.prompt), 'AI:n bedömer inte skådespelaren och bryter inte scenen');
+check(userFirst.prompt.includes(b.vill) && userFirst.prompt.includes(b.inre) && userFirst.prompt.includes(a.vill), 'AI:n får sin rolls vilja och inre liv, och vet vad din roll vill');
+check(/undertext/.test(userFirst.prompt) && /energi/.test(userFirst.prompt), 'AI:n ska spela med undertext och möta din energi');
 const aiFirst = buildAiSetup(scene, b.id);
 check(aiFirst.firstMessage === scene.repliker[0].text && aiFirst.aiName === a.namn, 'När AI:ns roll börjar säger AI:n första repliken');
 

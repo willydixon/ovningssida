@@ -11,7 +11,7 @@
 import { getStore } from '@netlify/blobs';
 import {
   PLAN, PRICE, WITHDRAWAL_DAYS, json, stripe, isTestKey, readToken, bearer, tokenFor, activeStatus,
-  readSeconds, monthKey
+  readSeconds, monthKey, licenseSecret
 } from '../lib/plus.mjs';
 
 // Sidan som köpet och Stripes kundsida går tillbaka till, och texten vid köpknappen, per språk.
@@ -95,16 +95,16 @@ async function minutes(store, sub) {
 
 export async function handle(request, env = process.env, f = fetch, store = null) {
   const key = env.STRIPE_SECRET_KEY;
-  const secret = env.LICENSE_SECRET;
   const url = new URL(request.url);
   const route = url.pathname.replace(/^\/api\/plus\/?/, '');
-  const ready = !!key && !!secret;
+  const ready = !!key;
   const blobs = () => store || getStore('ai-minuter');
 
   if (route === 'info') return json({ available: ready, test: ready && isTestKey(key), price: PRICE.amount / 100 });
   if (!ready) return json({ available: false }, 503);
 
   try {
+    const secret = await licenseSecret(env, blobs());
     if (route === 'checkout' && request.method === 'POST') {
       const language = await pageLanguage(request);
       const home = `${url.origin}${HOME[language]}`;

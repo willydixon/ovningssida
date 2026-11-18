@@ -15,7 +15,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { randomUUID } from 'node:crypto';
-import { PLAN, MAX_AI_CONVERSATION, json, readToken, bearer, readSeconds, addSeconds, monthKey, dayKey, freeDailySeconds } from '../lib/plus.mjs';
+import { PLAN, MAX_AI_CONVERSATION, json, readToken, bearer, readSeconds, addSeconds, monthKey, dayKey, freeDailySeconds, licenseSecret } from '../lib/plus.mjs';
 
 const API = 'https://api.elevenlabs.io/v1/convai';
 export const AGENT_NAMES = { gratis: 'ovningssida-motspelare-v1', plus: 'ovningssida-motspelare-plus-v1' };
@@ -85,7 +85,8 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
   if (new URL(request.url).searchParams.has('check')) return json({ available: true });
 
   const blobs = store || getStore('ai-minuter');
-  const license = readToken(bearer(request), env.LICENSE_SECRET);
+  const token = bearer(request);
+  const license = token ? readToken(token, await licenseSecret(env, blobs)) : null;
   const plan = license && license.exp > Math.floor(Date.now() / 1000) ? 'plus' : 'gratis';
 
   // Hur mycket tid som får reserveras för samtalet.

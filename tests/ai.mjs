@@ -134,6 +134,15 @@ check(data.max_seconds === 600 && store.data.get(`plus/sub_123/${month}`) === '6
 await store.set(`plus/sub_123/${month}`, '3590');
 res = await handle(req('', 'GET', plusToken), ENV, el.fetchImpl, store);
 check(res.status === 402 && (await res.json()).error === 'no_minutes', 'När Plus-minuterna är slut startar inget nytt samtal');
+// Utan LICENSE_SECRET används nyckeln som Plus-funktionen har sparat i Netlify Blobs.
+const { resetSecretCache } = await import('../netlify/lib/plus.mjs');
+resetSecretCache();
+const savedStore = memoryStore();
+await savedStore.set('hemlis/licens', 'sparad-hemlis');
+const savedToken = signToken({ plan: 'plus', sub: 'sub_9', cus: 'cus_9', start: now, exp: now + 3600 }, 'sparad-hemlis');
+res = await handle(req('', 'GET', savedToken), { ELEVENLABS_API_KEY: 'hemlig' }, fakeElevenLabs().fetchImpl, savedStore);
+check((await res.json()).plan === 'plus', 'AI-motspelaren känner igen Plus med den sparade nyckeln');
+resetSecretCache();
 const fake = signToken({ plan: 'plus', sub: 'sub_123', exp: now + 3600 }, 'fel-hemlis');
 res = await handle(req('', 'GET', fake), ENV, fakeElevenLabs().fetchImpl, memoryStore());
 check((await res.json()).plan === 'gratis', 'En licenskod med fel underskrift ger inte Plus');

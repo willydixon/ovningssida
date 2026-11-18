@@ -1,7 +1,7 @@
 // Tester för Plus: licenskoden, Stripe-anropen, köpet, kontrollen, kundsidan och ångerknappen.
 // Stripe ersätts av en låtsas-Stripe, så inga riktiga anrop görs. Körs med: node tests/plus.mjs
 
-import { formParams, signToken, readToken, tokenFor, bearer, PRICE } from '../netlify/lib/plus.mjs';
+import { formParams, signToken, readToken, tokenFor, bearer, PRICE, licenseSecret, resetSecretCache } from '../netlify/lib/plus.mjs';
 import { handle, resetCache } from '../netlify/functions/plus.mjs';
 
 const failures = [];
@@ -77,6 +77,26 @@ const req = (route, { method = 'GET', token: tok, body } = {}) => new Request(`h
   headers: { ...(tok ? { authorization: `Bearer ${tok}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
   body: body ? JSON.stringify(body) : undefined
 });
+
+// ---- Nyckeln för licenskoderna ----
+// Utan LICENSE_SECRET skapas en slumpad nyckel en gång och sparas i Netlify Blobs.
+resetSecretCache();
+const secretStore = memoryStore();
+const made = await licenseSecret({}, secretStore);
+resetSecretCache();
+check(made.length >= 60 && (await licenseSecret({}, secretStore)) === made && secretStore.data.get('hemlis/licens') === made, 'Utan LICENSE_SECRET skapas en nyckel en gång och sparas');
+resetSecretCache();
+check((await licenseSecret({}, memoryStore())) !== made, 'Varje sajt får en egen slumpad nyckel');
+check((await licenseSecret({ LICENSE_SECRET: 'egen' }, memoryStore())) === 'egen', 'En LICENSE_SECRET i Netlify går före');
+resetSecretCache();
+const onlyStripe = { STRIPE_SECRET_KEY: 'sk_test_hemlig' };
+const autoStore = memoryStore();
+let res0 = await handle(req('activate?session_id=cs_test_abc'), onlyStripe, fakeStripe().fetchImpl, autoStore);
+const autoToken = (await res0.json()).token;
+check(!!readToken(autoToken, autoStore.data.get('hemlis/licens')), 'Bara Stripes nyckel behövs: licenskoden skrivs under med den sparade nyckeln');
+res0 = await handle(req('status', { token: autoToken }), onlyStripe, fakeStripe().fetchImpl, autoStore);
+check((await res0.json()).plan === 'plus', 'Licenskoden godkänns med den sparade nyckeln');
+resetSecretCache();
 
 // ---- Info ----
 let res = await handle(req('info'), {}, fakeStripe().fetchImpl, memoryStore());

@@ -1,15 +1,16 @@
 // Gemensamt för Plus och AI-minuterna: anrop till Stripe, licenskoden som visar att
 // någon har Plus, och räkningen av AI-minuter.
 //
-// Miljövariabler i Netlify (hemliga):
+// Miljövariabler i Netlify:
 // - STRIPE_SECRET_KEY: Stripes hemliga nyckel. sk_test_ betyder testläge, utan riktiga pengar.
-// - LICENSE_SECRET: slumpad nyckel som licenskoderna skrivs under med.
+// - LICENSE_SECRET (valfri): nyckeln som licenskoderna skrivs under med. Saknas den skapar
+//   funktionen en slumpad nyckel första gången och sparar den i Netlify Blobs.
 // - FREE_AI_SECONDS_PER_DAY: hur många AI-sekunder alla gratisanvändare får tillsammans per dygn.
 //
 // Ingen video eller ljud passerar här. Hos Stripe finns kundens betaluppgifter, och här
 // sparas bara prenumerationens nummer och hur många AI-sekunder som har använts.
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const PLAN = {
   plus: { aiSeconds: 3600, takeSeconds: 600 }, // 60 AI-minuter i månaden, tagningar upp till 10 minuter
@@ -100,6 +101,24 @@ export function readToken(token, secret) {
   } catch {
     return null;
   }
+}
+
+// Nyckeln som licenskoderna skrivs under med. Om två funktioner startar samtidigt första
+// gången vinner den som sparar först (onlyIfNew), och båda använder den nyckeln.
+const SECRET_KEY = 'hemlis/licens';
+let cachedSecret = null;
+export const resetSecretCache = () => { cachedSecret = null; };
+export async function licenseSecret(env, store) {
+  if (env.LICENSE_SECRET) return env.LICENSE_SECRET;
+  if (cachedSecret) return cachedSecret;
+  let secret = await store.get(SECRET_KEY);
+  if (!secret) {
+    await store.set(SECRET_KEY, randomBytes(48).toString('base64url'), { onlyIfNew: true });
+    secret = await store.get(SECRET_KEY);
+  }
+  if (!secret) throw new Error('Licensnyckeln gick inte att skapa');
+  cachedSecret = secret;
+  return secret;
 }
 
 export const bearer = (request) => {

@@ -8,6 +8,7 @@ import { SCENES } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
 import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
 import { AiPartner, buildAiSetup } from './ai-partner.js';
+import { challengeFor, WARMUP } from './content.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
 const MAX_SECONDS = 180;
@@ -61,14 +62,155 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 
+// Skärmarna där menyn längst ned syns, och vilken flik som då är vald.
+const TABS = { start: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
+
 function show(name) {
   for (const el of document.querySelectorAll('[data-screen]')) {
     el.hidden = el.dataset.screen !== name;
   }
   if (name !== 'check') cancelAnimationFrame(state.meterRaf);
+  if (name !== 'warmup') stopWarmupTimer();
+  const tab = TABS[name];
+  $('#tabbar').hidden = !tab;
+  document.body.classList.toggle('with-tabs', !!tab);
+  for (const b of document.querySelectorAll('#tabbar [data-tab]')) {
+    if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  }
   window.scrollTo(0, 0);
   const heading = document.querySelector(`[data-screen="${name}"] h1`);
   if (heading) heading.focus({ preventScroll: true });
+}
+
+// ---------- Hemskärmen ----------
+
+function greeting(hour = new Date().getHours()) {
+  if (hour >= 5 && hour < 10) return t('greet_morning');
+  if (hour >= 10 && hour < 17) return t('greet_day');
+  if (hour >= 17 && hour < 23) return t('greet_evening');
+  return t('greet_night');
+}
+
+function renderHome() {
+  $('#h-start').textContent = greeting();
+  $('#daily-text').textContent = challengeFor();
+}
+
+// Kameran används bara av den som har bekräftat 18 år. Svaret gäller tills sidan stängs.
+function requireAdult(next) {
+  if (state.adult) {
+    next();
+    return;
+  }
+  state.afterAge = next;
+  $('#age-ok').checked = false;
+  $('#age-continue').disabled = true;
+  show('age');
+}
+
+function goScenes() {
+  stopCamera();
+  clearTake();
+  resetScenePicker();
+  show('scenes');
+}
+
+// Dagens utmaning spelas in som en scen med en enda roll och utan motspelare.
+function startDaily() {
+  stopCamera();
+  clearTake();
+  state.scene = {
+    id: 'dagens-utmaning',
+    titel: t('daily_kicker'),
+    situation: challengeFor(),
+    langd_sekunder: 120,
+    roller: [{ id: 'A', namn: t('daily_you') }],
+    repliker: []
+  };
+  chooseRole('A');
+}
+
+// ---------- Uppvärmning ----------
+
+const warm = { step: 0, timer: 0, twister: 0 };
+
+function stopWarmupTimer() {
+  clearInterval(warm.timer);
+  warm.timer = 0;
+}
+
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+function renderWarmup() {
+  stopWarmupTimer();
+  const ex = WARMUP[warm.step];
+  $('#warmup-step').textContent = t('warmup_step', { n: warm.step + 1, total: WARMUP.length });
+  $('#h-warmup').textContent = ex.titel;
+  $('#warmup-text').textContent = ex.text;
+  $('#breath').hidden = !ex.andning;
+  $('#breath-label').textContent = '';
+  $('#breath-circle').className = 'breath-circle';
+  $('#twister').hidden = !ex.lista;
+  if (ex.lista) $('#twister-text').textContent = ex.lista[warm.twister % ex.lista.length];
+  $('#warmup-timer').hidden = true;
+  $('#warmup-start').hidden = !ex.sekunder;
+  $('#warmup-next').textContent = warm.step === WARMUP.length - 1 ? t('warmup_finish') : t('warmup_next');
+}
+
+function startWarmup() {
+  warm.step = 0;
+  renderWarmup();
+  show('warmup');
+}
+
+// Klockan för steget. Andningen visar också in, håll och ut i takt.
+function runWarmupTimer() {
+  const ex = WARMUP[warm.step];
+  stopWarmupTimer();
+  const started = Date.now();
+  const timer = $('#warmup-timer');
+  timer.hidden = false;
+  $('#warmup-start').hidden = true;
+  const phases = ex.andning || [];
+  const cycle = phases.reduce((sum, [, s]) => sum + s, 0);
+  const tick = () => {
+    const elapsed = Math.floor((Date.now() - started) / 1000);
+    const left = Math.max(0, ex.sekunder - elapsed);
+    timer.textContent = left > 0 ? t('warmup_time_left', { time: clock(left) }) : t('warmup_time_done');
+    if (cycle && left > 0) {
+      let at = elapsed % cycle;
+      for (const [phase, seconds] of phases) {
+        if (at < seconds) {
+          const key = { in: 'breath_in', hall: 'breath_hold', ut: 'breath_out' }[phase];
+          $('#breath-label').textContent = t(key);
+          $('#breath-circle').className = `breath-circle ${phase}`;
+          break;
+        }
+        at -= seconds;
+      }
+    }
+    if (left === 0) {
+      stopWarmupTimer();
+      $('#breath-label').textContent = '';
+      $('#breath-circle').className = 'breath-circle';
+      $('#warmup-next').focus({ preventScroll: true });
+    }
+  };
+  tick();
+  warm.timer = setInterval(tick, 250);
+}
+
+function nextWarmup() {
+  if (warm.step < WARMUP.length - 1) {
+    warm.step += 1;
+    renderWarmup();
+    window.scrollTo(0, 0);
+    $('#h-warmup').focus({ preventScroll: true });
+  } else {
+    stopWarmupTimer();
+    show('warmup-done');
+  }
 }
 
 // ---------- Startsida ----------
@@ -109,14 +251,34 @@ function renderScenes() {
     button.type = 'button';
     button.className = 'scene';
 
-    const title = document.createElement('strong');
-    title.textContent = scene.titel;
+    if (scene.bild) {
+      const img = document.createElement('img');
+      img.className = 'scene-img';
+      img.src = `img/${scene.bild}.svg`;
+      img.alt = '';
+      img.width = 400;
+      img.height = 240;
+      img.decoding = 'async';
+      button.append(img);
+    }
+
+    const tags = document.createElement('span');
+    tags.className = 'tags';
+    if (scene.genre) {
+      const genre = document.createElement('span');
+      genre.className = 'tag';
+      genre.textContent = scene.genre;
+      tags.append(genre);
+    }
     if (scene.status !== 'godkand') {
       const badge = document.createElement('span');
-      badge.className = 'badge';
+      badge.className = 'tag badge';
       badge.textContent = t('scene_draft_badge');
-      title.append(' ', badge);
+      tags.append(badge);
     }
+
+    const title = document.createElement('strong');
+    title.textContent = scene.titel;
 
     const situation = document.createElement('span');
     situation.textContent = scene.situation;
@@ -128,7 +290,7 @@ function renderScenes() {
       : t('scene_not_reviewed');
     meta.textContent = t('scene_meta', { length: formatLength(scene.langd_sekunder), roles: scene.roller.length, approval });
 
-    button.append(title, situation, meta);
+    button.append(tags, title, situation, meta);
     button.addEventListener('click', () => pickScene(scene));
     list.append(button);
   }
@@ -606,6 +768,13 @@ function partnerMode() {
 // Visar bara de val som fungerar här, och texten som hör till det valda. Tills
 // användaren själv har valt gäller ordningen på sidan: AI, mobilens röst, ingen röst.
 function updateModes() {
+  // Dagens utmaning och andra övningar med en enda roll har ingen motspelare.
+  const solo = !state.scene || state.scene.roller.length < 2;
+  $('#partner-box').hidden = solo;
+  if (solo) {
+    $('#mode-none').checked = true;
+    return;
+  }
   const aiOk = !!state.aiAvailable && !!state.micSource && !!window.AudioWorkletNode;
   $('#mode-ai-row').hidden = !aiOk;
   const radios = [...document.querySelectorAll('input[name="partner"]')];
@@ -750,8 +919,8 @@ function stopPartner() {
 function resetPartner() {
   stopPartner();
   stopAi();
-  updateVoice();
   $('#partner-box').hidden = false;
+  updateVoice(); // gömmer valet igen om scenen bara har en roll
   $('#partner-done').hidden = true;
   $('#ai-status').hidden = true;
   $('#ai-log').hidden = true;
@@ -919,16 +1088,27 @@ document.addEventListener('click', (event) => {
   if (!target) return;
   switch (target.dataset.action) {
     case 'copy-link': copyLink(); break;
-    case 'to-age': show('age'); break;
-    case 'to-start': stopCamera(); clearTake(); show('start'); break;
-    case 'to-scenes':
-      if (!$('#age-ok').checked && !state.adult) return;
+    case 'to-start': stopCamera(); clearTake(); renderHome(); show('start'); break;
+    case 'play-scenes':
+    case 'to-scenes': requireAdult(goScenes); break;
+    case 'daily': requireAdult(startDaily); break;
+    case 'age-continue': {
+      if (!$('#age-ok').checked) return;
       state.adult = true;
-      stopCamera();
-      clearTake();
-      resetScenePicker();
-      show('scenes');
+      const next = state.afterAge || goScenes;
+      state.afterAge = null;
+      next();
       break;
+    }
+    case 'warmup': startWarmup(); break;
+    case 'warmup-start': runWarmupTimer(); break;
+    case 'warmup-next': nextWarmup(); break;
+    case 'next-twister': {
+      const list = WARMUP[warm.step].lista;
+      warm.twister += 1;
+      if (list) $('#twister-text').textContent = list[warm.twister % list.length];
+      break;
+    }
     case 'pick-other-scene': resetScenePicker(); $('#h-scenes').focus({ preventScroll: true }); break;
     case 'run-check': runCheck(); break;
     case 'to-record': toRecord(); break;
@@ -964,5 +1144,6 @@ document.addEventListener('change', (event) => {
 });
 
 renderScenes();
+renderHome();
 updateVoice();
 show('start');

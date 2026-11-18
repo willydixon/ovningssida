@@ -1,11 +1,14 @@
 // Scenerna i testversionen. Alla är utkast som AI har hjälpt till att skriva.
 // En kunnig person ska godkänna varje scen innan sidan öppnas för alla.
-// Format: se fliken Byggspecifikation, avsnittet Scenformat.
+// Format: se fliken Byggspecifikation, avsnittet Scenformat. genre visas på kortet, och
+// bild är namnet på bilden i public/img/, som tools/render-pages.mjs skapar.
 
 export const SCENES = [
   {
     id: 'scen-001',
     titel: 'Nyckeln',
+    genre: 'Drama',
+    bild: 'kitchen',
     situation: 'Sam och Robin delar lägenhet. Det är sent på kvällen, och nyckeln till cykelförrådet är borta.',
     langd_sekunder: 90,
     // vill: vad rollen vill i scenen, visas för den som spelar rollen.
@@ -37,6 +40,8 @@ export const SCENES = [
   {
     id: 'scen-002',
     titel: 'Intervjun',
+    genre: 'Komedi',
+    bild: 'cafe',
     situation: 'Noor söker jobb på ett kafé. Kim intervjuar och har bråttom.',
     langd_sekunder: 75,
     roller: [
@@ -66,6 +71,8 @@ export const SCENES = [
   {
     id: 'scen-003',
     titel: 'Beskedet',
+    genre: 'Drama',
+    bild: 'dinner',
     situation: 'Syskonen Mika och Jo dukar inför mammas födelsedag. Mika har något att berätta.',
     langd_sekunder: 90,
     roller: [

@@ -4,15 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
-<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="color-scheme" content="dark">
 <title>{{page_title}}</title>
 <link rel="stylesheet" href="app.css">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
-<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1c1b1a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0d0b09">
 <meta name="apple-mobile-web-app-title" content="{{app_name}}">
 <script type="module" src="app.js"></script>
 </head>
@@ -21,22 +20,70 @@
 
 <main id="app">
 
-  <!-- 1. Startsida -->
-  <section data-screen="start" aria-labelledby="h-start">
-    <h1 id="h-start" tabindex="-1">{{start_title}}</h1>
-    <p class="lead">{{start_lead}}</p>
-    <ul class="promises">
-      <li><strong>{{start_promise_1_title}}</strong> {{start_promise_1_text}}</li>
-      <li><strong>{{start_promise_2_title}}</strong> {{start_promise_2_text}}</li>
-      <li><strong>{{start_promise_3_title}}</strong> {{start_promise_3_text}}</li>
-    </ul>
+  <!-- 1. Hem -->
+  <section data-screen="start" class="home" aria-labelledby="h-start">
+    <div class="topbar">
+      <img src="icons/icon-192.png" alt="" class="appicon" width="34" height="34">
+      <span class="appname">{{app_name}}</span>
+    </div>
+    <h1 id="h-start" tabindex="-1" class="greeting">{{greet_day}}</h1>
+    <p class="sub">{{home_sub}}</p>
+    <article class="hero" aria-labelledby="h-daily">
+      <p class="kicker" id="h-daily">{{icon:flame}}{{daily_kicker}}</p>
+      <p class="hero-text" id="daily-text"></p>
+      <div class="hero-row">
+        <button type="button" class="primary" data-action="daily">{{daily_button}}</button>
+        <span class="meta">{{icon:timer}}{{daily_time}}</span>
+      </div>
+    </article>
+    <div class="tiles">
+      <button type="button" class="tile" data-action="play-scenes">{{icon:clapperboard}}<strong>{{tile_scene}}</strong><span>{{tile_scene_text}}</span></button>
+      <div class="tile soon">{{icon:messages-square}}<strong>{{tile_improv}}</strong><span>{{tile_improv_text}}</span><em>{{soon}}</em></div>
+      <div class="tile soon">{{icon:drama}}<strong>{{tile_fiveways}}</strong><span>{{tile_fiveways_text}}</span><em>{{soon}}</em></div>
+      <button type="button" class="tile" data-action="warmup">{{icon:audio-lines}}<strong>{{tile_warmup}}</strong><span>{{tile_warmup_text}}</span></button>
+      <div class="tile soon">{{icon:lamp-desk}}<strong>{{tile_monologue}}</strong><span>{{tile_monologue_text}}</span><em>{{soon}}</em></div>
+      <div class="tile soon">{{icon:film}}<strong>{{tile_takes}}</strong><span>{{tile_takes_text}}</span><em>{{soon}}</em></div>
+    </div>
     <div class="notice" id="inapp-notice" hidden>
       <p><strong>{{inapp_title}}</strong> {{inapp_text}}</p>
       <p>{{inapp_how}}</p>
       <button type="button" class="secondary" data-action="copy-link">{{inapp_copy_button}}</button>
       <p class="small" data-copy-status aria-live="polite"></p>
     </div>
-    <button type="button" class="primary" data-action="to-age">{{start_button}}</button>
+    <ul class="promises">
+      <li><strong>{{start_promise_1_title}}</strong> {{start_promise_1_text}}</li>
+      <li><strong>{{start_promise_2_title}}</strong> {{start_promise_2_text}}</li>
+      <li><strong>{{start_promise_3_title}}</strong> {{start_promise_3_text}}</li>
+    </ul>
+  </section>
+
+  <!-- Uppvärmning, utan kamera -->
+  <section data-screen="warmup" aria-labelledby="h-warmup" hidden>
+    <p class="kicker">{{icon:audio-lines}}<span id="warmup-step"></span></p>
+    <h1 id="h-warmup" tabindex="-1"></h1>
+    <p class="lead" id="warmup-text"></p>
+    <div class="breath" id="breath" hidden>
+      <div class="breath-circle" id="breath-circle"></div>
+      <p class="breath-label" id="breath-label" aria-live="polite"></p>
+    </div>
+    <div class="twister" id="twister" hidden>
+      <p class="twister-text" id="twister-text"></p>
+      <button type="button" class="ghost" data-action="next-twister">{{warmup_new_twister}}</button>
+    </div>
+    <p class="timer" id="warmup-timer" aria-live="polite" hidden></p>
+    <div class="row">
+      <button type="button" class="secondary" data-action="warmup-start" id="warmup-start">{{warmup_start}}</button>
+      <button type="button" class="primary" data-action="warmup-next" id="warmup-next">{{warmup_next}}</button>
+    </div>
+  </section>
+
+  <section data-screen="warmup-done" aria-labelledby="h-warmup-done" hidden>
+    <h1 id="h-warmup-done" tabindex="-1">{{warmup_done_title}}</h1>
+    <p class="lead">{{warmup_done_text}}</p>
+    <div class="row">
+      <button type="button" class="primary" data-action="play-scenes">{{warmup_done_scene}}</button>
+      <button type="button" class="secondary" data-action="daily">{{warmup_done_daily}}</button>
+    </div>
   </section>
 
   <!-- 2. Bekräfta 18 år -->
@@ -49,7 +96,7 @@
     </label>
     <div class="row">
       <button type="button" class="ghost" data-action="to-start">{{age_button_back}}</button>
-      <button type="button" class="primary" data-action="to-scenes" id="age-continue" disabled>{{age_button_continue}}</button>
+      <button type="button" class="primary" data-action="age-continue" id="age-continue" disabled>{{age_button_continue}}</button>
     </div>
   </section>
 
@@ -164,6 +211,12 @@
   </section>
 
 </main>
+
+<nav class="tabbar" id="tabbar" aria-label="{{nav_label}}">
+  <button type="button" data-action="to-start" data-tab="start">{{icon:house}}<span>{{nav_home}}</span></button>
+  <button type="button" data-action="play-scenes" data-tab="scenes">{{icon:clapperboard}}<span>{{nav_scenes}}</span></button>
+  <button type="button" data-action="warmup" data-tab="warmup">{{icon:sparkles}}<span>{{nav_train}}</span></button>
+</nav>
 
 <footer>
   <nav aria-label="{{footer_label}}">

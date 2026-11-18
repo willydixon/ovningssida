@@ -63,7 +63,7 @@ try {
       };
     }, c);
     await page.goto(`http://localhost:${PORT}/index.html`);
-    await page.getByRole('button', { name: 'Börja öva' }).click();
+    await page.locator('.tile[data-action="play-scenes"]').click();
     await page.locator('#age-ok').check();
     await page.locator('#age-continue').click();
     await page.locator('.scene').first().click();

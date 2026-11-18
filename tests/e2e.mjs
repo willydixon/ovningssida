@@ -53,7 +53,7 @@ try {
 
   await page.goto(`${BASE}/index.html`);
   check(bytes < 500 * 1024, `Sidvikt vid första besöket: ${Math.round(bytes / 1024)} kB (gräns 500 kB)`);
-  await page.getByRole('button', { name: 'Börja öva' }).click();
+  await page.locator('.tile[data-action="play-scenes"]').click();
   check(await page.locator('#age-continue').isDisabled(), '18 år: Fortsätt är spärrad innan rutan är ikryssad');
   check((await page.evaluate(() => window.__gum)) === 0, '18 år: kameran har inte startats före bekräftelsen');
   await page.locator('#age-ok').check();
@@ -114,7 +114,7 @@ try {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('nej', 'NotAllowedError'));
   });
   await p2.goto(`${BASE}/index.html`);
-  await p2.getByRole('button', { name: 'Börja öva' }).click();
+  await p2.locator('.tile[data-action="play-scenes"]').click();
   await p2.locator('#age-ok').check();
   await p2.locator('#age-continue').click();
   await p2.locator('.scene').first().click();
@@ -300,7 +300,7 @@ try {
   const talk = (on) => p6.evaluate((v) => window.__talk(v), on);
 
   await p6.goto(`${BASE}/index.html`);
-  await p6.getByRole('button', { name: 'Börja öva' }).click();
+  await p6.locator('.tile[data-action="play-scenes"]').click();
   await p6.locator('#age-ok').check();
   await p6.locator('#age-continue').click();
   await p6.locator('.scene').first().click();
@@ -459,7 +459,7 @@ try {
   const aiStatus = () => p7.locator('#ai-status').innerText();
 
   await p7.goto(`${BASE}/index.html`);
-  await p7.getByRole('button', { name: 'Börja öva' }).click();
+  await p7.locator('.tile[data-action="play-scenes"]').click();
   await p7.locator('#age-ok').check();
   await p7.locator('#age-continue').click();
   await p7.locator('.scene').first().click();
@@ -531,6 +531,77 @@ try {
   const p7odd = p7requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
   check(p7odd.length === 0, `Bara ljud går till ElevenLabs, inget annat lämnar sidan (${p7odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
   await p7ctx.close();
+
+  // ---- 8. Hemskärmen, dagens utmaning och uppvärmningen ----
+  const { challengeFor } = await import('../public/content.js');
+  const p8ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p8ctx.route('**/api/ai-start**', (route) => route.fulfill({ json: { available: false } }));
+  const p8 = await p8ctx.newPage();
+  const p8errors = [];
+  p8.on('console', (m) => { if (m.type() === 'error') p8errors.push(m.text()); });
+  p8.on('pageerror', (e) => p8errors.push(String(e)));
+  await p8.addInitScript(() => {
+    window.__gum = 0;
+    const md = navigator.mediaDevices;
+    const orig = md.getUserMedia.bind(md);
+    md.getUserMedia = (c) => { window.__gum += 1; return orig(c); };
+  });
+  await p8.goto(`${BASE}/index.html`);
+  await p8.evaluate(() => document.fonts.ready);
+  check(['God morgon.', 'Hej.', 'God kväll.', 'God natt.'].includes(await p8.locator('#h-start').innerText()), 'Hemskärmen hälsar efter tiden på dygnet');
+  check((await p8.locator('#daily-text').innerText()) === challengeFor(new Date()), 'Hemskärmen visar dagens utmaning');
+  check(await p8.evaluate(() => document.fonts.check('700 20px Fraunces') && document.fonts.check('400 16px Inter')), 'Typsnitten Fraunces och Inter laddas från den egna sidan');
+  check(await p8.locator('#tabbar').isVisible() && (await p8.locator('#tabbar [aria-current="page"]').innerText()).includes('Hem'), 'Menyn längst ned syns och Hem är vald');
+  check((await p8.locator('.tile.soon').count()) === 4 && (await p8.locator('button.tile').count()) === 2, 'Hemskärmen: två övningar fungerar och fyra är märkta Snart');
+
+  // Uppvärmningen behöver ingen kamera.
+  await p8.locator('.tile[data-action="warmup"]').click();
+  check((await p8.locator('#h-warmup').innerText()) === 'Andas' && await p8.locator('#breath').isVisible(), 'Uppvärmning: första steget är andning med en cirkel');
+  await p8.locator('#warmup-start').click();
+  await sleep(600);
+  check((await p8.locator('#breath-label').innerText()) === 'Andas in' && /kvar$/.test(await p8.locator('#warmup-timer').innerText()), 'Uppvärmning: klockan går och säger när du ska andas in');
+  await p8.locator('#warmup-next').click();
+  check((await p8.locator('#h-warmup').innerText()) === 'Läppar och tunga' && !(await p8.locator('#warmup-timer').isVisible()), 'Uppvärmning: nästa steg börjar utan klocka');
+  await p8.locator('#warmup-next').click();
+  const twister = await p8.locator('#twister-text').innerText();
+  await p8.getByRole('button', { name: 'En annan tungvrickare' }).click();
+  check(await p8.locator('#twister').isVisible() && (await p8.locator('#twister-text').innerText()) !== twister, 'Uppvärmning: man kan byta tungvrickare');
+  await p8.locator('#warmup-next').click();
+  check((await p8.locator('#warmup-next').innerText()) === 'Klar', 'Uppvärmning: sista steget avslutas med Klar');
+  await p8.locator('#warmup-next').click();
+  check(await p8.locator('[data-screen="warmup-done"]').isVisible() && (await p8.evaluate(() => window.__gum)) === 0, 'Uppvärmning: klar utan att kameran startades');
+
+  // Dagens utmaning spelas in utan motspelare.
+  await p8.locator('[data-screen="warmup-done"] [data-action="daily"]').click();
+  check(await p8.locator('[data-screen="age"]').isVisible() && await p8.locator('#tabbar').isHidden(), 'Dagens utmaning: 18-årsfrågan kommer först, utan menyn');
+  await p8.locator('#age-ok').check();
+  await p8.locator('#age-continue').click();
+  await p8.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p8.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p8.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p8.locator('#partner-box').isHidden() && (await p8.locator('#script').innerText()).includes(challengeFor(new Date())), 'Dagens utmaning: uppgiften står på skärmen och ingen motspelare behövs');
+  await p8.locator('#start-rec').click();
+  await p8.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+  await sleep(1500);
+  await p8.locator('#stop-rec').click();
+  await p8.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  check(((await p8.locator('#playback').getAttribute('src')) || '').startsWith('blob:'), 'Dagens utmaning: tagningen går att titta på');
+
+  // Tillbaka till scenerna: bilder och genrer, och partnervalet kommer tillbaka.
+  await p8.getByRole('button', { name: 'Spara' }).click();
+  await p8.locator('[data-screen="save"] [data-action="to-scenes"]').click();
+  await p8.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
+  const images = await p8.$$eval('.scene-img', (imgs) => imgs.map((i) => i.complete && i.naturalWidth > 0));
+  check(images.length === 3 && images.every(Boolean), 'Scenerna har bilder som laddas');
+  check((await p8.locator('.scene .tag').first().innerText()).toLowerCase() === 'drama', 'Scenerna visar genre');
+  await p8.locator('.scene').first().click();
+  await p8.locator('#role-buttons button').first().click();
+  await p8.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+  await p8.getByRole('button', { name: 'Till inspelningen' }).click();
+  await p8.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+  check(await p8.locator('#partner-box').isVisible(), 'En scen med två roller visar valet av motspelare igen');
+  check(p8errors.length === 0, `Inga fel på hemskärmen och i övningarna (${p8errors.join(' | ') || 'inga'})`);
+  await p8ctx.close();
 } finally {
   await browser.close();
   server.kill();

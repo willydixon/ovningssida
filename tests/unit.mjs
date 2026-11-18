@@ -1,7 +1,7 @@
 // Enhetstester utan webbläsare: teknikkollens gränser och scenfilernas format.
 // Körs med: node tests/unit.mjs
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from '../public/check.js';
 import { SCENES } from '../public/scenes.js';
 import { sv, t } from '../public/texts.js';
@@ -72,6 +72,22 @@ for (const s of SCENES) {
   }
   check(s.ai_stod === true || s.ai_stod === false, `${where}: anger om AI har hjälpt till`);
 }
+
+// ---- Bilder, utmaningar och uppvärmning ----
+const { CHALLENGES, challengeFor, WARMUP } = await import('../public/content.js');
+const { renderImages, IMAGES } = await import('../tools/render-pages.mjs');
+for (const s of SCENES) {
+  check(typeof s.genre === 'string' && s.genre.length > 0, `Scen ${s.id}: har genre`);
+  check(existsSync(path.join(IMAGES, `${s.bild}.svg`)), `Scen ${s.id}: bilden ${s.bild}.svg finns`);
+}
+for (const [name, svg] of renderImages()) {
+  check(svg === readFileSync(path.join(IMAGES, name), 'utf8'), `img/${name} är skapad av tools/render-pages.mjs`);
+}
+check(CHALLENGES.length >= 7 && CHALLENGES.every((c) => typeof c === 'string' && c.trim() === c && c.length > 10), 'Utmaningarna är minst sju och har text');
+check(challengeFor(new Date(2026, 0, 1)) !== challengeFor(new Date(2026, 0, 2)) && challengeFor(new Date(2026, 5, 3, 8)) === challengeFor(new Date(2026, 5, 3, 22)), 'Ny utmaning varje dag, samma hela dagen');
+check(WARMUP.length === 4 && WARMUP.every((w) => w.titel && w.text && (w.sekunder || w.lista)), 'Uppvärmningen har fyra steg med text och klocka eller lista');
+const breath = WARMUP.find((w) => w.andning);
+check(!!breath && breath.andning.reduce((sum, [, sec]) => sum + sec, 0) * 3 === breath.sekunder, 'Andningen går jämnt upp i tre varv');
 
 // ---- Texterna ----
 // Alla texter ligger i texts.js. Sidorna i templates/ och manifest.json skapas från dem.

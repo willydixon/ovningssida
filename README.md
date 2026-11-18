@@ -18,6 +18,18 @@ Under inspelningen kan mobilens inbyggda uppläsningsröst läsa motspelarens re
 - Gränserna är startvärden. De behöver provas på riktiga mobiler, särskilt om rösten hörs svagt på iPhone medan mikrofonen är på.
 - Testerna i `tests/partner.mjs` och avsnitt 6 i `tests/e2e.mjs` använder en falsk röst och en falsk mikrofon som testet styr.
 
+## Utseendet Premiär och den riktiga versionen
+
+William valde 18 november 2026 utseendet Premiär bland tre förslag (`design/forslag/`), och bad om en större app med mer att göra, fler bilder och mer inlevelse.
+
+- `public/app.css`: mörkt och filmiskt, med guld som accentfärg. Typsnitten Fraunces och Inter ligger i `public/fonts/` (SIL Open Font License). Säkerhetspolicyn tillåter `font-src 'self'`.
+- Hemskärmen hälsar efter tiden på dygnet, visar dagens utmaning och övningarna. Menyn längst ned syns på hemskärmen, scenerna och uppvärmningen.
+- Dagens utmaning (`public/content.js`) byts varje dag och spelas in som en scen med en roll, utan motspelare.
+- Uppvärmningen har fyra steg utan kamera: andning med en cirkel i takt, läppar och tunga, tungvrickare och rösten i rummet.
+- Scenerna har egna SVG-bilder i `public/img/`, som `tools/render-pages.mjs` ritar från `tools/scene-art.mjs`, och en genre.
+- Ikonerna kommer från Lucide (ISC-licens) och ligger i `tools/icons/`. I mallarna skrivs de som `{{icon:namn}}`.
+- Improvisera med AI, En replik fem sätt, Monolog och Mina tagningar är märkta Snart och byggs härnäst, liksom Din spelstil och fler språk (svenska och engelska först, sedan spanska, tyska och franska).
+
 ## AI-motspelaren (test)
 
 William valde 15 november 2026 att testa en AI-motspelare från ElevenLabs, som lyssnar och svarar med naturlig röst.

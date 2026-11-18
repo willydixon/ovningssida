@@ -7,5 +7,6 @@ node tests/unit.mjs
 node tests/partner.mjs
 node tests/ai.mjs
 node tests/plus.mjs
+node tests/style.mjs
 node tests/e2e.mjs
 node tests/levels.mjs

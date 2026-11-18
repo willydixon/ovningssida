@@ -9,6 +9,7 @@ import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, ra
 import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
 import { AiPartner, buildAiSetup } from './ai-partner.js';
 import { challengeFor, WARMUP, fiveWaysScene, MONOLOGUES, monologueScene, IMPROVS, improvScene } from './content.js';
+import { FRAME_MS, pitchHz, createStyleMeter, readStyle, styleById, band } from './style.js';
 import { FREE_TAKES, canSaveMore, takeId, listTakes, getTake, addTake, deleteTake, countTakes, isQuotaError } from './takes.js';
 import { t } from './texts.js'; // alla texter som visas ligger i texts.js
 
@@ -53,6 +54,11 @@ const state = {
   takeSeconds: 0, // hur lång den senaste tagningen blev
   savedTakeId: null, // satt när tagningen finns i Mina tagningar
   takeView: null, // tagningen som visas från Mina tagningar: { id, url, file }
+  // Din spelstil
+  styleMeter: null,
+  styleTimer: 0,
+  styleReading: null, // det som visas efter tagningen
+  partnerEndedAt: 0, // när motspelarens röst senast tystnade
   // Motspelaren
   voice: null,
   player: null,
@@ -774,6 +780,7 @@ async function startRecording() {
   state.recTimer = setInterval(updateRecTime, 250);
   if (withPartner) startPartner();
   if (state.ai) state.ai.begin();
+  startStyle();
 }
 
 function updateRecTime() {
@@ -784,6 +791,7 @@ function updateRecTime() {
 
 function stopRecording(reason) {
   clearInterval(state.recTimer);
+  finishStyle();
   stopPartner();
   stopAi();
   if (!state.stopReason) state.stopReason = reason || 'user';
@@ -826,6 +834,7 @@ function onRecordingStopped() {
   $('#playback-error').hidden = true;
   playback.onerror = () => { $('#playback-error').hidden = false; };
   playback.src = state.blobUrl;
+  renderStyle($('#style-review'), state.styleReading);
   show('review');
 }
 
@@ -949,6 +958,7 @@ function speakLine(text) {
       done = true;
       clearTimeout(timer);
       state.partnerSpeaking = false;
+      state.partnerEndedAt = Date.now();
       resolve();
     };
     // Om rösten inte fungerar får användaren läsa repliken, ungefär så länge som den tar att säga.
@@ -1184,6 +1194,97 @@ function toSave() {
   show('save');
 }
 
+// ---------- Din spelstil ----------
+// Under tagningen mäts rösten var 50:e ms i mobilen (style.js): styrka och tonhöjd.
+// Medan motspelaren eller AI:n pratar mäts inget. Inget skickas någonstans.
+
+function startStyle() {
+  clearInterval(state.styleTimer);
+  state.styleReading = null;
+  state.styleMeter = null;
+  const analyser = state.analyser;
+  if (!analyser || !state.audioCtx) return;
+  const meter = createStyleMeter();
+  const buf = new Float32Array(analyser.fftSize);
+  state.styleMeter = meter;
+  state.styleTimer = setInterval(() => {
+    const aiTalking = !!(state.ai && state.ai.live && state.ai.aiTalking());
+    if (state.partnerSpeaking || aiTalking || Date.now() - state.partnerEndedAt < AFTER_PARTNER_MS) {
+      meter.push(null);
+      return;
+    }
+    if (analyser.getFloatTimeDomainData) {
+      analyser.getFloatTimeDomainData(buf);
+    } else {
+      const bytes = new Uint8Array(buf.length);
+      analyser.getByteTimeDomainData(bytes);
+      for (let i = 0; i < bytes.length; i++) buf[i] = (bytes[i] - 128) / 128;
+    }
+    const { rmsDb } = levelsFrom(buf);
+    meter.push({ db: rmsDb, hz: rmsDb > -50 ? pitchHz(buf, state.audioCtx.sampleRate) : 0 });
+  }, FRAME_MS);
+}
+
+function finishStyle() {
+  clearInterval(state.styleTimer);
+  state.styleTimer = 0;
+  if (!state.styleMeter) return;
+  state.styleReading = readStyle(state.styleMeter.summary());
+  state.styleMeter = null;
+}
+
+function el(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+
+const TEMPO_TEXT = { low: 'style_obs_tempo_low', mid: 'style_obs_tempo_mid', high: 'style_obs_tempo_high' };
+const MELODY_TEXT = { low: 'style_obs_melody_low', mid: 'style_obs_melody_mid', high: 'style_obs_melody_high' };
+const DYNAMICS_TEXT = { low: 'style_obs_dynamics_low', mid: 'style_obs_dynamics_mid', high: 'style_obs_dynamics_high' };
+const decimal = (n) => n.toFixed(1).replace('.', ',');
+
+// Kortet med spelstilarna, iakttagelser utan betyg och en utmaning till nästa tagning.
+function renderStyle(box, reading) {
+  box.textContent = '';
+  box.hidden = !reading;
+  if (!reading) return;
+  box.append(el('h2', t('style_title')));
+  if (!reading.enough) {
+    box.append(el('p', t('style_too_little'), 'small'));
+    return;
+  }
+  box.append(el('p', t('style_lead'), 'small'));
+  const bars = el('div', '', 'style-bars');
+  for (const match of reading.matches.slice(0, 3)) {
+    const row = el('div', '', 'style-bar');
+    const track = el('span', '', 'style-track');
+    const fill = el('span', '', 'style-fill');
+    fill.style.width = `${match.procent}%`;
+    track.append(fill);
+    row.append(el('span', match.namn, 'style-name'), el('span', `${match.procent} %`, 'style-pct'), track);
+    bars.append(row);
+  }
+  box.append(bars);
+  const top = styleById(reading.matches[0].id);
+  if (top) box.append(el('p', t('style_most', { name: top.namn, text: top.text }), 'style-top'));
+  const m = reading.measures;
+  const p = reading.profile;
+  const notes = [t(TEMPO_TEXT[band(p.tempo)])];
+  if (m.pauses === 0) notes.push(t('style_obs_pauses_none'));
+  else if (m.pauses === 1) notes.push(t('style_obs_pause_one', { s: decimal(m.longestPause) }));
+  else notes.push(t('style_obs_pauses', { n: m.pauses, s: decimal(m.longestPause) }));
+  if (m.melody !== null && m.melody !== undefined) notes.push(t(MELODY_TEXT[band(p.melodi)]));
+  notes.push(t(DYNAMICS_TEXT[band(p.dynamik)]));
+  const list = el('ul', '', 'style-obs');
+  for (const note of notes) list.append(el('li', note));
+  box.append(list);
+  const other = styleById(reading.challenge);
+  if (other) box.append(el('p', t('style_challenge', { name: other.namn, how: other.hur }), 'style-challenge'));
+  box.append(el('p', t('style_note'), 'small'));
+}
+
 // ---------- Mina tagningar ----------
 // Tagningarna sparas i webbläsarens databas i mobilen (takes.js) och skickas aldrig någonstans.
 
@@ -1226,6 +1327,7 @@ async function saveToTakes() {
       sekunder: state.takeSeconds,
       typ: state.blob.type,
       storlek: state.blob.size,
+      stil: state.styleReading,
       video: state.blob
     });
     state.savedTakeId = id;
@@ -1282,6 +1384,12 @@ async function showTakes(message = '') {
     const meta = document.createElement('span');
     meta.textContent = takeMeta(take);
     text.append(title, meta);
+    if (take.stil && take.stil.enough) {
+      const tag = document.createElement('span');
+      tag.className = 'take-style';
+      tag.textContent = take.stil.matches[0].namn;
+      text.append(tag);
+    }
     button.append(icon, text);
     list.append(button);
   }
@@ -1329,6 +1437,7 @@ async function openTake(id) {
   link.href = url;
   link.download = name;
   $('#take-status').textContent = '';
+  renderStyle($('#style-take'), take.stil || null);
   $('#take-confirm').hidden = true;
   $('#take-delete').hidden = false;
   show('take');

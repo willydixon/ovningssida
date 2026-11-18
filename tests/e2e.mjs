@@ -1020,6 +1020,88 @@ try {
   const p11real = p11errors.filter((e) => !/404/.test(e));
   check(p11real.length === 0, `Inga fel i Mina tagningar (${p11real.join(' | ') || 'inga'})`);
   await p11ctx.close();
+
+  // ---- 12. Din spelstil ----
+  // Mikrofonen byts mot en ton på 180 Hz som testet slår av och på, som tal med pauser.
+  const p12ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p12ctx.route('**/api/**', (route) => route.fulfill({ json: { available: false } }));
+  const p12 = await p12ctx.newPage();
+  const p12errors = [];
+  const p12requests = [];
+  p12.on('console', (m) => { if (m.type() === 'error') p12errors.push(m.text()); });
+  p12.on('pageerror', (e) => p12errors.push(String(e)));
+  p12.on('request', (r) => p12requests.push({ url: r.url(), method: r.method() }));
+  await p12.addInitScript(() => {
+    const md = navigator.mediaDevices;
+    const orig = md.getUserMedia.bind(md);
+    md.getUserMedia = async (constraints) => {
+      const stream = await orig(constraints);
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      osc.frequency.value = 180;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.001;
+      const dest = ctx.createMediaStreamDestination();
+      osc.connect(gain).connect(dest);
+      osc.start();
+      window.__talk = (on) => { gain.gain.value = on ? 0.2 : 0.001; };
+      for (const track of stream.getAudioTracks()) { stream.removeTrack(track); track.stop(); }
+      stream.addTrack(dest.stream.getAudioTracks()[0]);
+      return stream;
+    };
+  });
+  const dailyTake = async (talk) => {
+    await p12.goto(`${BASE}/index.html`);
+    await p12.locator('[data-screen="start"] [data-action="daily"]').click();
+    await p12.locator('#age-ok').check();
+    await p12.locator('#age-continue').click();
+    await p12.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+    await p12.getByRole('button', { name: 'Till inspelningen' }).click();
+    await p12.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+    await p12.locator('#start-rec').click();
+    await p12.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+    await talk();
+    await p12.locator('#stop-rec').click();
+    await p12.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  };
+  await dailyTake(async () => {
+    for (let i = 0; i < 6; i++) {
+      await p12.evaluate(() => window.__talk(true));
+      await sleep(800);
+      await p12.evaluate(() => window.__talk(false));
+      await sleep(500);
+    }
+  });
+  const card = p12.locator('#style-review');
+  check(await card.isVisible() && (await card.locator('h2').innerText()) === 'Din spelstil', 'Din spelstil: kortet visas efter tagningen');
+  const pcts = (await card.locator('.style-pct').allInnerTexts()).map((v) => parseInt(v, 10));
+  const names = await card.locator('.style-name').allInnerTexts();
+  check(pcts.length === 3 && new Set(names).size === 3 && pcts.every((v) => v >= 0 && v <= 100) && pcts[0] >= pcts[1] && pcts[1] >= pcts[2] && pcts.reduce((a, b) => a + b, 0) <= 100,
+    `Din spelstil: de tre närmaste spelstilarna visas i procent (${names.map((n, i) => `${n} ${pcts[i]} %`).join(', ')})`);
+  const notes = await card.locator('.style-obs li').allInnerTexts();
+  check(notes.length >= 3 && notes.some((n) => /^Du tog \d+ pauser\./.test(n)), `Din spelstil: iakttagelser utan betyg (${notes.join(' ')})`);
+  check(/^Utmaning till nästa tagning: spela som /.test(await card.locator('.style-challenge').innerText()), 'Din spelstil: en utmaning till nästa tagning');
+  check(!/(betyg|poäng|bra|dålig)\b/i.test((await card.innerText()).replace('Det är ingen bedömning', '')), 'Din spelstil: inga betyg eller omdömen i kortet');
+
+  // Spelstilen sparas med tagningen i Mina tagningar.
+  await p12.getByRole('button', { name: 'Spara' }).click();
+  await p12.locator('#save-take-btn').click();
+  await p12.locator('#save-take-status').waitFor({ state: 'visible', timeout: 5000 });
+  await p12.locator('#save-take-open').click();
+  await p12.locator('.take').first().waitFor({ timeout: 5000 });
+  check((await p12.locator('.take .take-style').first().innerText()) === names[0], 'Din spelstil: Mina tagningar visar spelstilen för varje tagning');
+  await p12.locator('.take').first().click();
+  await p12.locator('[data-screen="take"]').waitFor({ state: 'visible' });
+  check(await p12.locator('#style-take').isVisible() && (await p12.locator('#style-take .style-name').first().innerText()) === names[0], 'Din spelstil: kortet finns kvar när tagningen öppnas igen');
+
+  // Utan tal blir det ingen spelstil.
+  await dailyTake(async () => { await sleep(2500); });
+  check(await card.isVisible() && (await card.innerText()).includes('för lite tal') && (await card.locator('.style-bar').count()) === 0, 'Din spelstil: utan tal står det att det var för lite tal');
+
+  const p12odd = p12requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
+  check(p12odd.length === 0, `Din spelstil skickar inget över nätet (${p12odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  check(p12errors.length === 0, `Inga fel i Din spelstil (${p12errors.join(' | ') || 'inga'})`);
+  await p12ctx.close();
 } finally {
   await browser.close();
   server.kill();

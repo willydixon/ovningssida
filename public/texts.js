@@ -24,7 +24,7 @@ export const sv = {
   lang_other: 'English',
   lang_other_code: 'en',
   lang_other_label: 'Read in English',
-  date_locale: 'sv-SE',
+  locale_code: 'sv-SE',
 
   // ---- 1. Startsida ----
   // Hemskärmen
@@ -418,7 +418,7 @@ export const en = {
   lang_other: 'Svenska',
   lang_other_code: 'sv',
   lang_other_label: 'Läs på svenska',
-  date_locale: 'en-GB',
+  locale_code: 'en-GB',
 
   // ---- 1. Home ----
   greet_morning: 'Good morning.',

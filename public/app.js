@@ -339,10 +339,13 @@ $('#age-ok').addEventListener('change', (e) => {
 
 // ---------- Scener ----------
 
+// Tal med en decimal på sidans språk: 1,5 på svenska och 1.5 på engelska.
+const decimal = (n) => new Intl.NumberFormat(t('locale_code'), { maximumFractionDigits: 1 }).format(n);
+
 function formatLength(seconds) {
   if (seconds < 60) return t('length_seconds', { n: seconds });
   const minutes = Math.round((seconds / 60) * 2) / 2;
-  return t('length_minutes', { n: String(minutes).replace('.', ',') });
+  return t('length_minutes', { n: decimal(minutes) });
 }
 
 // Genrerna i den ordning de först förekommer, och den som är vald.
@@ -1270,7 +1273,6 @@ function el(tag, text, className) {
 const TEMPO_TEXT = { low: 'style_obs_tempo_low', mid: 'style_obs_tempo_mid', high: 'style_obs_tempo_high' };
 const MELODY_TEXT = { low: 'style_obs_melody_low', mid: 'style_obs_melody_mid', high: 'style_obs_melody_high' };
 const DYNAMICS_TEXT = { low: 'style_obs_dynamics_low', mid: 'style_obs_dynamics_mid', high: 'style_obs_dynamics_high' };
-const decimal = (n) => n.toFixed(1).replace('.', ',');
 
 // Kortet med spelstilarna, iakttagelser utan betyg och en utmaning till nästa tagning.
 function renderStyle(box, reading) {
@@ -1366,7 +1368,7 @@ async function saveToTakes() {
   }
 }
 
-const takeDate = (ms) => new Date(ms).toLocaleString(t('date_locale'), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const takeDate = (ms) => new Date(ms).toLocaleString(t('locale_code'), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function takeMeta(take) {
   const values = { role: take.roll, date: takeDate(take.skapad), length: clock(take.sekunder || 0) };
@@ -1726,7 +1728,7 @@ function showWithdraw() {
   $('#angra-ok').checked = false;
   $('#angra-send').disabled = true;
   if (payload) {
-    const date = new Date(payload.start * 1000).toLocaleDateString(t('date_locale'));
+    const date = new Date(payload.start * 1000).toLocaleDateString(t('locale_code'));
     $('#angra-contract').textContent = t('angra_contract', { id: payload.sub, date });
   }
   show('angra');
@@ -1740,7 +1742,7 @@ async function sendWithdraw() {
   try {
     const { ok, data } = await api('/api/plus/angra', { method: 'POST', body: { namn: name, bekraftat: true } });
     if (ok) {
-      const time = new Date(data.received).toLocaleString(t('date_locale'));
+      const time = new Date(data.received).toLocaleString(t('locale_code'));
       if (data.status === 'angrat') {
         result.textContent = t('angra_done', { time });
         setPlan(null);
@@ -1748,7 +1750,7 @@ async function sendWithdraw() {
         result.textContent = t('angra_already');
         setPlan(null);
       } else {
-        result.textContent = t('angra_cancelled', { time, date: new Date(data.ends * 1000).toLocaleDateString(t('date_locale')) });
+        result.textContent = t('angra_cancelled', { time, date: new Date(data.ends * 1000).toLocaleDateString(t('locale_code')) });
       }
       result.hidden = false;
       $('#angra-form').hidden = true;

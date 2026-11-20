@@ -5,7 +5,7 @@
 // och sidornas kod i templates/, inte i public/. manifest.json skapas också här.
 // Informationssidorna (om.html med flera) är handskrivna och ligger inte i templates/.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -17,6 +17,10 @@ export const TEMPLATES = path.join(root, 'templates');
 export const PUBLIC = path.join(root, 'public');
 export const MANIFEST = path.join(PUBLIC, 'manifest.json');
 export const IMAGES = path.join(PUBLIC, 'img');
+// Ansiktsanalysen (public/face.js): modellen läggs in för hand, och models.json säger om den finns,
+// så att sidan kan fråga utan att få 404 när den saknas.
+export const FACE_DIR = path.join(PUBLIC, 'vendor', 'mediapipe');
+export const renderFaceModels = () => `${JSON.stringify({ ansikte: existsSync(path.join(FACE_DIR, 'face_landmarker.task')) })}\n`;
 // Svenska sidor ligger i public/, engelska i public/en/. Skript, stil, ikoner och bilder
 // är gemensamma och ligger i public/.
 export const LANG_DIRS = { sv: PUBLIC, en: path.join(PUBLIC, 'en') };
@@ -52,7 +56,10 @@ export const ART_PALETTE = {
   wall1: '#2a1f17', wall2: '#120d0a', sky1: '#0c2630', sky2: '#14404a', moon: '#f6e6c4', city: '#071318',
   light: '#f2b544', frame: '#0a0705', lamp: '#2e2118', table: '#0d0907', key: '#f2b544', person: '#050403',
   machine: '#0d0907', steam: '#f6e6c4', cup: '#3a2a1e', dark1: '#07090c', dark2: '#020304', screen: '#9fd9ff',
-  train: '#0e1418', platform: '#08090a'
+  train: '#0e1418', platform: '#08090a',
+  // Till nivå 2–5: eld, vatten, rymd, sten och guld.
+  fire: '#e0603a', water: '#0b2a33', wave: '#1d5a6b', space1: '#03050b', space2: '#0b1630', planet: '#c9733a',
+  stone: '#1a1512', gold: '#d9a640', field: '#0d1a10', alien: '#9fe6c9'
 };
 
 // Bilderna till scenerna, som [filnamn, svg].
@@ -102,6 +109,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
     await writeFile(path.join(LANG_DIRS[lang], 'manifest.json'), renderManifest(TEXTS[lang], lang));
   }
+  await writeFile(path.join(FACE_DIR, 'models.json'), renderFaceModels());
   await mkdir(IMAGES, { recursive: true });
   const images = renderImages();
   for (const [name, svg] of images) await writeFile(path.join(IMAGES, name), svg);

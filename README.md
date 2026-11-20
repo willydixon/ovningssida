@@ -47,7 +47,7 @@ William valde 15 november 2026 att testa en AI-motspelare från ElevenLabs, som 
 
 William valde 18 november 2026 Plus för 99 kr i månaden, med köp i testläge hos Stripe först.
 
-- Gratis: alla övningar, mobilens röst som motspelare, 5 AI-minuter att prova och tagningar upp till 3 minuter. Plus: 60 AI-minuter i månaden, den mer levande AI-rösten, samtal och tagningar upp till 10 minuter och obegränsat i Mina tagningar.
+- Gratis: alla övningar, nivå 1 med 5 scener, betyg och resultat, mobilens röst som motspelare, 5 AI-minuter att prova och tagningar upp till 3 minuter. Plus: nivå 2–5 med 20 scener till, 60 AI-minuter i månaden, den mer levande AI-rösten, samtal och tagningar upp till 10 minuter och obegränsat i Mina tagningar.
 - `netlify/functions/plus.mjs` svarar på `/api/plus/*`: `info`, `checkout` (Stripes betalsida), `activate` (efter betalningen), `status`, `portal` (Stripes kundsida för kort och uppsägning), `aterstall` och `kod` (återställningskoden) och `angra` (ångerknappen). Gemensam kod finns i `netlify/lib/plus.mjs`.
 - Priset och inställningarna för Stripes kundsida skapas av funktionen första gången och hittas sedan igen, så inget behöver ställas in för hand hos Stripe.
 - Efter köpet får mobilen en licenskod, underskriven med `LICENSE_SECRET`. Den innehåller prenumerationens och kundens nummer hos Stripe, aldrig e-post, och kontrolleras mot Stripe minst en gång per dygn.
@@ -57,6 +57,28 @@ William valde 18 november 2026 Plus för 99 kr i månaden, med köp i testläge 
 - Miljövariabel i Netlify: `STRIPE_SECRET_KEY` (börjar med `sk_test_` i testläge). Utan den går det inte att köpa, och Plus-sidan säger det. Nyckeln som licenskoderna skrivs under med skapas av funktionen första gången och sparas i Netlify Blobs (`hemlis/licens`), om inte `LICENSE_SECRET` är satt. Netlify sa nej när nyckeln skulle märkas som hemlig via API:t 18 november 2026, kanske för att det kräver en dyrare plan. Som vanlig miljövariabel syns den för den som har tillgång till Netlify-kontot, men aldrig på sidan.
 - Innan något säljs på riktigt: säljarens namn, organisationsnummer, adress, e-post och telefon i `kopvillkor.html`, F-skatt och moms, en jurist som läser köpvillkoren, och en bekräftelse av ångern på e-post (ett varaktigt medium). I appar från App Store och Google Play måste köp i stället göras med deras egna betalsystem.
 - Testerna i `tests/plus.mjs` använder en låtsas-Stripe, och avsnitt 10 i `tests/e2e.mjs` går igenom köpet, minuterna, kundsidan och ångern i webbläsaren.
+
+## Betyg, nivåer och resultat
+
+William bad 20 november 2026 om betyg för olika roller, häftigare roller på högre nivåer (som superhjälte och antagonist), minst 5 scener innan man får ett resultat med en sammanfattning, och svar på om man passar för mindre eller större roller. Han valde betyg 1–10, att nivå 2–5 ingår i Plus, och alla fyra sorters scener.
+
+- Scenerna (`public/scenes.js`) ligger i fem nivåer med 5 scener var: 1 Vardag (gratis), 2 Thriller, deckare och skräck, 3 Stora dramer, 4 Sci-fi och fantasy, 5 Superhjältar och skurkar. Alla 20 nya scener är utkast skrivna med AI-stöd, med påhittade figurer, och ska godkännas av en kunnig person. Bilderna ritas i `tools/scene-art.mjs`.
+- Varje roll har en typ (till exempel skurken) och ett krav (`kraver`), en av förinställningarna i `public/rating.js`: var tempo, pauser, dynamik, melodi, energi och ansiktets uttryck bör ligga för rollen, på skalan 0–1.
+- Betyget (`rateTake`) jämför rösten från Din spelstil och ansiktet, om användaren har sagt ja, med rollens krav. Rösten väger 70 % och ansiktet 30 % när ansiktet har mätts. Blicken nere i texten mer än 40 % av tiden drar ned upp till ett steg. Två tips och en styrka visas efter tagningen.
+- Det bästa betyget för varje scen sparas i mobilens `localStorage` (`provspelning`), bara som siffror. När alla fem scener i en nivå har betyg visar `levelResult` snittet, starkaste och svagaste rollen, bredden (hur mycket rösten ändrades mellan rollerna jämfört med hur olika rollerna är), det som återkommer, och större roller, mindre roller eller grunden först. Sammanfattningen skrivs av fasta regler i mobilen, inte av en språkmodell.
+- Alla gränser är startvärden. De behöver provas på riktiga mobiler och av kunniga personer innan betyget kan sägas betyda något mer än en fingervisning, och det står på sidan.
+- Plus-nivåerna låses i mobilen, som de andra Plus-sakerna. Scenernas text finns i `scenes.js` och går alltså att läsa för den som letar. Det räcker för testversionen. I apparna bör låsningen göras mot köpet hos App Store och Google Play.
+- Testerna: `tests/rating.mjs` (betyget och resultatet), enhetstesterna (nivåerna och rollernas krav) och avsnitt 14–15 i `tests/e2e.mjs` (fem tagningar, resultatet, rensa, och nivåerna med Plus).
+
+## Ansiktets spel
+
+William svarade inte på frågan om ansiktet 20 november 2026. Det byggdes enligt rekommendationen: AI:n mäter hur ansiktet spelar, bara om användaren säger ja, och utseendet får aldrig något betyg. Ett betyg på utseendet går inte att lita på, blir ofta orättvist mot till exempel hudfärg, ålder och kön, och behöver en jurist först.
+
+- `public/face.js` använder MediaPipe Face Landmarker från Google (`@mediapipe/tasks-vision` 1.2.3, Apache-2.0), som ligger oförändrad i `public/vendor/mediapipe/` med sin licens. Allt körs i mobilen. Inga bilder sparas eller skickas.
+- Under tagningen läses ansiktets uttryck (blendshapes) av fem gånger i sekunden. Att prata, blinka och titta åt sidan räknas inte som uttryck. Efter tagningen finns bara två siffror kvar: `uttryck` (hur mycket ansiktet spelade) och `blickNere` (hur ofta blicken var nere i texten). Inga känslor gissas. EU:s AI-förordning har särskilda regler för system som tolkar känslor, och juristen bör bekräfta att det här inte räknas dit. Syns ansiktet mindre än halva tiden räknas det inte alls.
+- Modellen `face_landmarker.task` (ungefär 3,6 MB) kunde inte hämtas härifrån och läggs in för hand i `public/vendor/mediapipe/`. Den finns hos Google: https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task. Kör sedan `node tools/render-pages.mjs`, som skriver `models.json`. Utan modellen visas inte frågan om ansiktet, och betyget bygger bara på rösten.
+- Läs Googles modellkort för Face Landmarker innan sidan öppnas för alla. Juristen bör också titta på ansiktsanalysen, även om den körs i mobilen.
+- Sidans säkerhetspolicy tillåter `wasm-unsafe-eval`, som MediaPipe behöver. Första gången laddas upp till 19 MB: MediaPipe 15 MB och modellen 3,6 MB. Det laddas bara efter ett ja.
 
 ## Anmälan och frågor
 

@@ -20,9 +20,16 @@
 <a class="back" href="index.html">← Tillbaka till övningen</a>
 <h1>Så används AI</h1>
 <p>AI hjälper till att skriva utkast till scenerna. En människa ska läsa och godkänna varje scen innan sidan öppnas för alla. Varje scen visar om den är ett utkast eller godkänd, och av vem.</p>
-<p>AI bedömer inte dig. Teknikkollen är vanlig mätning av ljudnivå och ljus i din mobil. Den tolkar varken ditt ansikte eller dina känslor.</p>
+<p>Teknikkollen är vanlig mätning av ljudnivå och ljus i din mobil. Den tolkar varken ditt ansikte eller dina känslor.</p>
 <p>Din spelstil är också vanlig mätning i mobilen, inte AI: tempo, pauser, tonhöjd och styrka i rösten. Den tolkar varken ditt ansikte eller dina känslor, och spelstilarna är påhittade.</p>
 <p>Motspelarens röst är mobilens inbyggda uppläsningsröst, samma som mobilen använder för att läsa upp text. Den körs i mobilen, och sidan skickar inte replikerna någonstans. För att veta när du har sagt din replik mäter sidan bara hur starkt ljudet är. Den lyssnar inte på vad du säger.</p>
+<h2>Betyget och resultatet</h2>
+<p>Efter varje scen får du ett betyg från 1 till 10 för rollen du spelade. Det räknas ut i din mobil. Sidan mäter rösten, alltså tempo, pauser, tonhöjd, styrka och energi, och jämför med vad rollen kräver. Varje roll har ett krav som vi har bestämt, till exempel en lugn och låg röst för en skurk eller mycket energi för en hjälte. Om du har sagt ja till ansiktsanalysen räknas också hur ansiktet spelar.</p>
+<p>När alla fem scener i en nivå har betyg får du ett resultat med en sammanfattning. Sammanfattningen skrivs i mobilen efter fasta regler. Den lyfter fram din starkaste och svagaste roll, hur mycket du ändrade rösten mellan rollerna och det som återkom, och säger om större eller mindre roller passar dig just nu.</p>
+<p>Betyget är en fingervisning från mätningar. Det är inte en människas omdöme om din talang, och inget säger om du kommer att lyckas som skådespelare. Ingen människa och ingen språkmodell tittar på dina tagningar. Betygen sparas bara i din mobil, och du kan rensa dem när du vill.</p>
+<h2>Ansiktets spel</h2>
+<p>Om du säger ja tittar mobilen på hur ditt ansikte spelar under tagningen. Det görs med MediaPipe, en AI-modell från Google som körs helt i din mobil. Filerna hämtas från vår egen sida. Modellen läser av uttryck, till exempel hur mycket ögonbrynen rör sig och om du ler, och om blicken är nere i texten.</p>
+<p>Inga bilder sparas eller skickas. Efter tagningen finns bara två siffror kvar: hur mycket ansiktet spelade och hur ofta blicken var nere i texten. Ansiktsanalysen bedömer inte hur du ser ut och gissar inte vad du känner. Om ansiktet syns för dåligt, till exempel i svagt ljus, räknas det inte alls, varken upp eller ned. Du kan stänga av den när du vill på inspelningsskärmen.</p>
 <h2>AI-motspelaren (test)</h2>
 <p>Om du väljer AI som motspelare spelar en AI från företaget ElevenLabs den andra rollen och svarar på det du säger. Den har en datorgjord röst. Den bedömer dig inte och bryter inte scenen för att ge råd.</p>
 <p>Medan scenen pågår skickas ljudet från mikrofonen till ElevenLabs, så att AI:n kan höra dig och svara. Medan AI:n själv pratar skickas tystnad. Videon skickas aldrig.</p>

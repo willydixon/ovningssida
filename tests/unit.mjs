@@ -3,7 +3,8 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from '../public/check.js';
-import { SCENES, SCENES_BY_LANG } from '../public/scenes.js';
+import { SCENES, SCENES_BY_LANG, LEVELS_BY_LANG, scenesInLevel } from '../public/scenes.js';
+import { DEMANDS, LEVEL_SIZE } from '../public/rating.js';
 import { sv, en, t, TEXTS, LANGS } from '../public/texts.js';
 import { renderPage, renderManifest, readTemplates, PUBLIC, MANIFEST, LANG_DIRS, pageOptions } from '../tools/render-pages.mjs';
 import path from 'node:path';
@@ -72,12 +73,22 @@ for (const s of scenes) {
     check(s.godkand_av === null && s.godkand_datum === null, `${where}: utkast saknar godkännande`);
   }
   check(s.ai_stod === true || s.ai_stod === false, `${where}: anger om AI har hjälpt till`);
+  check(Number.isInteger(s.niva) && s.niva >= 1 && s.niva <= 5, `${where}: nivå 1–5`);
+  check(s.roller.every((r) => typeof r.typ === 'string' && r.typ.length > 0 && r.typ[0] === r.typ[0].toLowerCase()), `${where}: varje roll har en typ, med liten bokstav först`);
+  check(s.roller.every((r) => Object.hasOwn(DEMANDS, r.kraver)), `${where}: varje roll har ett krav som finns i rating.js`);
 }
 }
 // Varje språk har samma scener, med samma roller, repliker i samma ordning och samma bilder.
-const shape = (s) => JSON.stringify([s.id, s.bild, s.langd_sekunder, s.status, s.roller.map((r) => r.id), s.repliker.map((l) => l.roll)]);
+const shape = (s) => JSON.stringify([s.id, s.niva, s.bild, s.langd_sekunder, s.status, s.roller.map((r) => [r.id, r.kraver]), s.repliker.map((l) => l.roll)]);
 check(LANGS.every((l) => SCENES_BY_LANG[l] && SCENES_BY_LANG[l].map(shape).join() === SCENES_BY_LANG.sv.map(shape).join()), 'Scenerna är desamma på alla språk');
 check(SCENES === SCENES_BY_LANG.sv, 'Utan sida, som här, används de svenska scenerna');
+// Nivåerna: samma på alla språk, 5 scener var, nivå 1 gratis och nivå 2–5 i Plus.
+const levelShape = (list) => JSON.stringify(list.map((x) => [x.niva, x.plus]));
+check(LANGS.every((l) => LEVELS_BY_LANG[l] && levelShape(LEVELS_BY_LANG[l]) === levelShape(LEVELS_BY_LANG.sv) && LEVELS_BY_LANG[l].every((x) => x.namn && x.text)), 'Nivåerna finns på alla språk, med namn och text');
+check(LEVELS_BY_LANG.sv.map((x) => x.niva).join() === '1,2,3,4,5' && LEVELS_BY_LANG.sv.every((x) => scenesInLevel(x.niva).length === LEVEL_SIZE), `Fem nivåer med ${LEVEL_SIZE} scener var`);
+check(!LEVELS_BY_LANG.sv[0].plus && LEVELS_BY_LANG.sv.slice(1).every((x) => x.plus), 'Nivå 1 är gratis och nivå 2–5 ingår i Plus');
+// Rollerna i en nivå kräver olika saker, så att resultatet kan säga något om bredden.
+check(LEVELS_BY_LANG.sv.every((x) => new Set(scenesInLevel(x.niva).flatMap((s) => s.roller.map((r) => r.kraver))).size >= 4), 'Varje nivå har roller med minst fyra olika krav');
 
 // ---- Bilder, utmaningar och uppvärmning ----
 const { CHALLENGES, challengeFor, WARMUP } = await import('../public/content.js');
@@ -127,6 +138,12 @@ for (const language of LANGS) {
     `${path.relative(PUBLIC, manifest)} är skapad från texts.js (kör annars node tools/render-pages.mjs)`);
 }
 check(path.join(LANG_DIRS.sv, 'manifest.json') === MANIFEST, 'Den svenska appen har sitt manifest i public/');
+{
+  const { FACE_DIR, renderFaceModels } = await import('../tools/render-pages.mjs');
+  const models = path.join(FACE_DIR, 'models.json');
+  check(existsSync(models) && readFileSync(models, 'utf8') === renderFaceModels(), `vendor/mediapipe/models.json säger rätt om ansiktsmodellen finns (${existsSync(models) ? readFileSync(models, 'utf8').trim() : 'saknas'})`);
+  check(['vision_bundle.mjs', 'wasm/vision_wasm_internal.js', 'wasm/vision_wasm_internal.wasm', 'LICENSE', 'NOTICE.txt'].every((f) => existsSync(path.join(FACE_DIR, f))), 'MediaPipe och dess licens finns i public/vendor/mediapipe');
+}
 // Appen heter ActWith AI på alla språk. Det gamla arbetsnamnet ska inte synas någonstans.
 check(LANGS.every((l) => TEXTS[l].app_name === 'ActWith AI'), 'Appen heter ActWith AI på alla språk');
 const shownFiles = LANGS.flatMap((l) => readdirSync(LANG_DIRS[l]).filter((f) => f.endsWith('.html') || f === 'manifest.json').map((f) => path.join(LANG_DIRS[l], f)));

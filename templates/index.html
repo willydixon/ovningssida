@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="color-scheme" content="dark">
 <title>{{page_title}}</title>
 <link rel="stylesheet" href="{{@root}}app.css">
@@ -117,7 +117,18 @@
   <section data-screen="scenes" aria-labelledby="h-scenes" hidden>
     <h1 id="h-scenes" tabindex="-1">{{scenes_title}}</h1>
     <p>{{scenes_text}}</p>
-    <div class="chips" id="genre-chips" role="group" aria-label="{{genre_label}}"></div>
+    <div class="chips" id="level-chips" role="group" aria-label="{{levels_label}}"></div>
+    <div class="level-head" id="level-head">
+      <h2 id="level-name"></h2>
+      <p class="small" id="level-text"></p>
+      <p class="level-progress" id="level-progress"></p>
+      <button type="button" class="primary" data-action="show-result" id="level-result" hidden>{{icon:trophy}}{{level_result_button}}</button>
+      <div class="notice" id="level-lock" hidden>
+        <p>{{icon:lock}} {{level_locked}}</p>
+        <button type="button" class="primary" data-action="to-plus">{{plus_read_more}}</button>
+      </div>
+      <p class="small" id="level-status" aria-live="polite" hidden></p>
+    </div>
     <div id="scene-list" class="scene-list"></div>
     <div id="role-pick" hidden>
       <h2 id="h-role" tabindex="-1">{{role_title}}</h2>
@@ -170,6 +181,17 @@
       <p class="small" id="partner-note">{{partner_note}}</p>
       <p class="small" id="partner-no-voice" hidden>{{partner_no_voice}}</p>
     </fieldset>
+    <div class="notice" id="face-ask" hidden>
+      <p><strong>{{face_ask_title}}</strong> {{face_ask_text}}</p>
+      <div class="row">
+        <button type="button" class="primary" data-action="face-yes">{{face_yes}}</button>
+        <button type="button" class="secondary" data-action="face-no">{{face_no}}</button>
+      </div>
+    </div>
+    <label class="check" id="face-row" hidden>
+      <input type="checkbox" id="face-on">
+      <span>{{face_toggle}} <small class="face-status" id="face-status" aria-live="polite"></small></span>
+    </label>
     <p class="small" id="ai-note" hidden>{{ai_note}}</p>
     <div class="notice" id="ai-paywall" hidden>
       <p id="ai-paywall-text"></p>
@@ -199,7 +221,33 @@
       <button type="button" class="ghost" data-action="retake">{{review_button_retake}}</button>
       <button type="button" class="primary" data-action="to-save">{{review_button_save}}</button>
     </div>
+    <section class="rating-card" id="rating-review" aria-label="{{rating_title}}" hidden></section>
     <section class="style-card" id="style-review" aria-label="{{style_title}}" hidden></section>
+  </section>
+
+  <!-- Resultatet efter en nivå -->
+  <section data-screen="result" aria-labelledby="h-result" hidden>
+    <p class="kicker">{{icon:trophy}}<span id="result-level"></span></p>
+    <h1 id="h-result" tabindex="-1">{{result_title}}</h1>
+    <p class="result-score"><span class="score" id="result-total"></span><span class="of">{{rating_of}}</span></p>
+    <h2 id="result-verdict-title"></h2>
+    <p class="lead" id="result-verdict"></p>
+    <h2>{{result_summary_title}}</h2>
+    <div class="result-summary" id="result-summary"></div>
+    <h2>{{result_list_title}}</h2>
+    <ul class="result-list" id="result-list"></ul>
+    <p class="small">{{result_note}}</p>
+    <div class="row">
+      <button type="button" class="primary" data-action="to-scenes">{{result_more}}</button>
+      <button type="button" class="ghost" data-action="results-clear" id="results-clear">{{result_clear}}</button>
+    </div>
+    <div class="notice" id="results-clear-ask" hidden>
+      <p>{{result_clear_ask}}</p>
+      <div class="row">
+        <button type="button" class="danger" data-action="results-clear-yes">{{result_clear_yes}}</button>
+        <button type="button" class="ghost" data-action="results-clear-no">{{result_clear_no}}</button>
+      </div>
+    </div>
   </section>
 
   <!-- 7. Spara i Mina tagningar eller i mobilen -->
@@ -306,6 +354,7 @@
         <p class="price">{{plus_free_price}}</p>
         <ul>
           <li>{{plus_free_1}}</li>
+          <li>{{plus_free_rating}}</li>
           <li>{{plus_free_2}}</li>
           <li>{{plus_free_3}}</li>
           <li>{{plus_free_4}}</li>
@@ -315,6 +364,7 @@
         <h2>{{plus_plus_title}}</h2>
         <p class="price">{{plus_price}}</p>
         <ul>
+          <li>{{plus_plus_levels}}</li>
           <li>{{plus_plus_1}}</li>
           <li>{{plus_plus_2}}</li>
           <li>{{plus_plus_3}}</li>

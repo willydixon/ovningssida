@@ -2,15 +2,18 @@
 // Allt körs i mobilen. Inspelningen hålls i webbläsarens minne och skickas aldrig
 // någonstans. Sidans säkerhetspolicy (connect-src) tillåter bara anrop till den
 // egna sidan och till AI-motspelaren hos ElevenLabs, som bara får ljud och bara
-// när användaren har valt AI som motspelare.
+// när användaren har valt AI som motspelare. Betyget och ansiktsanalysen räknas
+// också i mobilen (rating.js och face.js), och inga bilder lämnar den.
 
-import { SCENES } from './scenes.js';
+import { SCENES, LEVELS, scenesInLevel } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
 import { ScenePlayer, createVoiceDetector, expectedMs } from './partner.js';
 import { AiPartner, buildAiSetup } from './ai-partner.js';
 import { challengeFor, WARMUP, fiveWaysScene, MONOLOGUES, monologueScene, IMPROVS, improvScene } from './content.js';
 import { FRAME_MS, pitchHz, createStyleMeter, readStyle, styleById, band } from './style.js';
 import { FREE_TAKES, canSaveMore, takeId, listTakes, getTake, addTake, deleteTake, countTakes, isQuotaError } from './takes.js';
+import { rateTake, demandFor, levelResult, readResults, addResult as addRating, RESULTS_KEY, LEVEL_SIZE, LOOK_DOWN_LIMIT } from './rating.js';
+import { FACE_MS, createFaceMeter, faceModelAvailable, loadFaceLandmarker, readFace } from './face.js';
 import { t, lang } from './texts.js'; // alla texter som visas ligger i texts.js, på sidans språk
 
 // Längsta tagning och AI-minuter beror på planen. Se också netlify/lib/plus.mjs.
@@ -77,13 +80,24 @@ const state = {
   micSource: null,
   aiAvailable: null, // null tills funktionen har svarat
   ai: null,
-  partnerChosen: false // sant när användaren själv har valt motspelare
+  partnerChosen: false, // sant när användaren själv har valt motspelare
+  // Nivåer och betyg
+  level: 1, // nivån som visas bland scenerna
+  rating: null, // betyget för den senaste tagningen
+  ratingBest: null, // det bästa betyget för scenen, efter den senaste tagningen
+  ratingImproved: false,
+  // Ansiktet
+  faceModel: null, // null tills det är kollat om modellen finns på sidan
+  faceLandmarker: null,
+  faceMeter: null,
+  faceTimer: 0,
+  faceReading: null
 };
 
 const $ = (sel) => document.querySelector(sel);
 
 // Skärmarna där menyn längst ned syns, och vilken flik som då är vald.
-const TABS = { start: 'start', pick: 'start', plus: 'start', angra: 'start', takes: 'start', take: 'start', scenes: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
+const TABS = { start: 'start', pick: 'start', plus: 'start', angra: 'start', takes: 'start', take: 'start', scenes: 'scenes', result: 'scenes', warmup: 'warmup', 'warmup-done': 'warmup' };
 
 function show(name) {
   for (const el of document.querySelectorAll('[data-screen]')) {
@@ -348,22 +362,35 @@ function formatLength(seconds) {
   return t('length_minutes', { n: decimal(minutes) });
 }
 
-// Genrerna i den ordning de först förekommer, och den som är vald.
-const GENRES = [...new Set(SCENES.map((s) => s.genre).filter(Boolean))];
-let genreFilter = '';
+// ---------- Nivåer ----------
+// Nivå 1 är gratis och nivå 2–5 ingår i Plus. Varje nivå har 5 scener, och när alla har
+// ett betyg kommer resultatet. Betygen sparas bara i mobilen (rating.js).
 
-function renderGenreChips() {
-  const box = $('#genre-chips');
+const levelLocked = (level) => !!(level && level.plus) && state.plan !== 'plus';
+const levelByNumber = (niva) => LEVELS.find((l) => l.niva === niva) || LEVELS[0];
+
+function loadResults() {
+  return readResults(storageGet(STORE.results));
+}
+
+function saveResults(results) {
+  storageSet(STORE.results, JSON.stringify(results));
+}
+
+function renderLevelChips() {
+  const box = $('#level-chips');
   box.textContent = '';
-  for (const genre of ['', ...GENRES]) {
+  for (const level of LEVELS) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip';
-    chip.textContent = genre || t('genre_all');
-    chip.setAttribute('aria-pressed', String(genre === genreFilter));
+    chip.textContent = t('level_chip', { n: level.niva });
+    if (levelLocked(level)) chip.append(el('span', t('level_chip_plus'), 'chip-plus'));
+    chip.setAttribute('aria-pressed', String(level.niva === state.level));
     chip.addEventListener('click', () => {
-      genreFilter = genre;
-      renderGenreChips();
+      state.level = level.niva;
+      $('#level-status').hidden = true;
+      renderLevelChips();
       renderScenes();
     });
     box.append(chip);
@@ -371,13 +398,25 @@ function renderGenreChips() {
 }
 
 function renderScenes() {
+  const level = levelByNumber(state.level);
+  const locked = levelLocked(level);
+  const scenes = scenesInLevel(level.niva);
+  const results = loadResults();
+  const done = scenes.filter((s) => results.scener[s.id]).length;
+  $('#level-name').textContent = t('level_title', { n: level.niva, name: level.namn });
+  $('#level-text').textContent = level.text;
+  $('#level-progress').textContent = t('level_progress', { done, total: scenes.length });
+  $('#level-progress').hidden = locked;
+  $('#level-result').hidden = done < scenes.length;
+  $('#level-result').dataset.level = String(level.niva);
+  $('#level-lock').hidden = !locked;
+
   const list = $('#scene-list');
   list.textContent = '';
-  for (const scene of SCENES) {
-    if (genreFilter && scene.genre !== genreFilter) continue;
+  for (const scene of scenes) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'scene';
+    button.className = locked ? 'scene locked' : 'scene';
 
     if (scene.bild) {
       const img = document.createElement('img');
@@ -392,18 +431,11 @@ function renderScenes() {
 
     const tags = document.createElement('span');
     tags.className = 'tags';
-    if (scene.genre) {
-      const genre = document.createElement('span');
-      genre.className = 'tag';
-      genre.textContent = scene.genre;
-      tags.append(genre);
-    }
-    if (scene.status !== 'godkand') {
-      const badge = document.createElement('span');
-      badge.className = 'tag badge';
-      badge.textContent = t('scene_draft_badge');
-      tags.append(badge);
-    }
+    if (scene.genre) tags.append(el('span', scene.genre, 'tag'));
+    if (locked) tags.append(el('span', t('level_chip_plus'), 'tag plus-tag'));
+    const best = results.scener[scene.id];
+    if (best) tags.append(el('span', t('scene_best', { betyg: best.betyg }), 'tag score-tag'));
+    if (scene.status !== 'godkand') tags.append(el('span', t('scene_draft_badge'), 'tag badge'));
 
     const title = document.createElement('strong');
     title.textContent = scene.titel;
@@ -419,15 +451,17 @@ function renderScenes() {
     meta.textContent = t('scene_meta', { length: formatLength(scene.langd_sekunder), roles: scene.roller.length, approval });
 
     button.append(tags, title, situation, meta);
-    button.addEventListener('click', () => pickScene(scene));
+    button.addEventListener('click', () => (locked ? showPlus(t('level_locked_message')) : pickScene(scene)));
     list.append(button);
   }
 }
 
 function pickScene(scene) {
   state.scene = scene;
+  if (scene.niva) state.level = scene.niva;
   $('#scene-list').hidden = true;
-  $('#genre-chips').hidden = true;
+  $('#level-chips').hidden = true;
+  $('#level-head').hidden = true;
   $('#role-pick').hidden = false;
   $('#role-situation').textContent = `${scene.titel}: ${scene.situation}`;
   const buttons = $('#role-buttons');
@@ -444,8 +478,11 @@ function pickScene(scene) {
 }
 
 function resetScenePicker() {
+  renderLevelChips();
+  renderScenes();
   $('#scene-list').hidden = false;
-  $('#genre-chips').hidden = false;
+  $('#level-chips').hidden = false;
+  $('#level-head').hidden = false;
   $('#role-pick').hidden = true;
 }
 
@@ -750,6 +787,7 @@ async function toRecord() {
   await refreshAiAvailability();
   renderPlanBits();
   resetPartner();
+  setupFace();
   $('#start-rec').hidden = false;
   $('#start-rec').disabled = false;
   $('#stop-rec').hidden = true;
@@ -809,6 +847,7 @@ async function startRecording() {
   if (withPartner) startPartner();
   if (state.ai) state.ai.begin();
   startStyle();
+  startFace();
 }
 
 function updateRecTime() {
@@ -820,6 +859,7 @@ function updateRecTime() {
 function stopRecording(reason) {
   clearInterval(state.recTimer);
   finishStyle();
+  finishFace();
   stopPartner();
   stopAi();
   if (!state.stopReason) state.stopReason = reason || 'user';
@@ -862,6 +902,8 @@ function onRecordingStopped() {
   $('#playback-error').hidden = true;
   playback.onerror = () => { $('#playback-error').hidden = false; };
   playback.src = state.blobUrl;
+  rateCurrentTake();
+  renderRating($('#rating-review'));
   renderStyle($('#style-review'), state.styleReading);
   show('review');
 }
@@ -1315,6 +1357,241 @@ function renderStyle(box, reading) {
   box.append(el('p', t('style_note'), 'small'));
 }
 
+// ---------- Ansiktet ----------
+// Bara om användaren har sagt ja, och bara för scenerna, som får betyg. Mobilen läser av
+// uttrycken i kamerabilden ungefär fem gånger i sekunden (face.js). Inga bilder sparas
+// eller skickas, och bara två siffror blir kvar efter tagningen.
+
+const rated = () => !!(state.scene && state.scene.niva);
+const faceAnswer = () => storageGet(STORE.face); // 'ja', 'nej' eller null om frågan inte är ställd
+
+async function setupFace() {
+  $('#face-ask').hidden = true;
+  $('#face-row').hidden = true;
+  if (!rated()) return;
+  if (state.faceModel === null) state.faceModel = await faceModelAvailable();
+  if (!state.faceModel) return;
+  const answer = faceAnswer();
+  if (answer === null) {
+    $('#face-ask').hidden = false;
+    return;
+  }
+  $('#face-row').hidden = false;
+  $('#face-on').checked = answer === 'ja';
+  $('#face-status').textContent = '';
+  if (answer === 'ja') prepareFace();
+}
+
+function setFaceAnswer(yes) {
+  storageSet(STORE.face, yes ? 'ja' : 'nej');
+  $('#face-ask').hidden = true;
+  $('#face-row').hidden = false;
+  $('#face-on').checked = yes;
+  $('#face-status').textContent = '';
+  if (yes) prepareFace();
+}
+
+async function prepareFace() {
+  if (state.faceLandmarker) return;
+  const status = $('#face-status');
+  status.textContent = t('face_loading');
+  try {
+    state.faceLandmarker = await loadFaceLandmarker();
+    status.textContent = t('face_ready');
+  } catch {
+    status.textContent = t('face_failed');
+  }
+}
+
+function startFace() {
+  clearInterval(state.faceTimer);
+  state.faceReading = null;
+  state.faceMeter = null;
+  if (!rated() || faceAnswer() !== 'ja' || !state.faceLandmarker) return;
+  const meter = createFaceMeter();
+  const video = $('#preview-record');
+  state.faceMeter = meter;
+  state.faceTimer = setInterval(() => {
+    try {
+      const categories = readFace(state.faceLandmarker, video, performance.now());
+      if (categories !== undefined) meter.push(categories);
+    } catch {
+      // Fungerar inte i den här mobilen: då räknas bara rösten.
+      clearInterval(state.faceTimer);
+      state.faceMeter = null;
+    }
+  }, FACE_MS);
+}
+
+function finishFace() {
+  clearInterval(state.faceTimer);
+  state.faceTimer = 0;
+  state.faceReading = state.faceMeter ? state.faceMeter.summary() : null;
+  state.faceMeter = null;
+}
+
+// ---------- Betyget ----------
+// Hur väl tagningen passade det rollen kräver, från 1 till 10 (rating.js). Det bästa
+// betyget för varje scen sparas i mobilen, och efter 5 scener i en nivå kommer resultatet.
+
+const TIP_TEXT = {
+  'tempo:mer': 'tip_tempo_more', 'tempo:mindre': 'tip_tempo_less',
+  'pauser:mer': 'tip_pauser_more', 'pauser:mindre': 'tip_pauser_less',
+  'dynamik:mer': 'tip_dynamik_more', 'dynamik:mindre': 'tip_dynamik_less',
+  'melodi:mer': 'tip_melodi_more', 'melodi:mindre': 'tip_melodi_less',
+  'energi:mer': 'tip_energi_more', 'energi:mindre': 'tip_energi_less',
+  'ansikte:mer': 'tip_ansikte_more', 'ansikte:mindre': 'tip_ansikte_less',
+  'blick:mindre': 'tip_eyes'
+};
+const NEED_TEXT = {
+  'tempo:mer': 'need_tempo_more', 'tempo:mindre': 'need_tempo_less',
+  'pauser:mer': 'need_pauser_more', 'pauser:mindre': 'need_pauser_less',
+  'dynamik:mer': 'need_dynamik_more', 'dynamik:mindre': 'need_dynamik_less',
+  'melodi:mer': 'need_melodi_more', 'melodi:mindre': 'need_melodi_less',
+  'energi:mer': 'need_energi_more', 'energi:mindre': 'need_energi_less',
+  'ansikte:mer': 'need_ansikte_more', 'ansikte:mindre': 'need_ansikte_less'
+};
+const STRENGTH_TEXT = { tempo: 'strength_tempo', pauser: 'strength_pauser', dynamik: 'strength_dynamik', melodi: 'strength_melodi', ansikte: 'strength_ansikte' };
+const tipId = (tip) => `${tip.key}:${tip.mer ? 'mer' : 'mindre'}`;
+const capitalize = (text) => (text ? text[0].toUpperCase() + text.slice(1) : text);
+
+function currentRole() {
+  return state.scene && state.scene.roller ? state.scene.roller.find((r) => r.id === state.role) || null : null;
+}
+
+function rateCurrentTake() {
+  state.rating = null;
+  state.ratingBest = null;
+  state.ratingImproved = false;
+  if (!rated()) return;
+  const demand = demandFor(currentRole());
+  const reading = state.styleReading;
+  const rating = rateTake({ measures: reading && reading.enough ? reading.measures : { enough: false }, face: state.faceReading, demand });
+  state.rating = rating;
+  if (!rating.enough) return;
+  const entry = { betyg: rating.betyg, roll: state.role, profil: rating.profil, tips: rating.tips, blickNere: rating.blickNere, datum: Date.now() };
+  const { results, best, improved } = addRating(loadResults(), state.scene.id, entry);
+  saveResults(results);
+  state.ratingBest = best;
+  state.ratingImproved = improved;
+}
+
+// Kortet med betyget efter tagningen: siffran, rösten och ansiktet, en styrka, tips och var i nivån man är.
+function renderRating(box) {
+  box.textContent = '';
+  const rating = state.rating;
+  const role = currentRole();
+  box.hidden = !rating || !role;
+  if (box.hidden) return;
+  box.append(el('h2', t('rating_title')));
+  if (!rating.enough) {
+    box.append(el('p', t('rating_too_little'), 'small'));
+    return;
+  }
+  const score = el('p', '', 'rating-score');
+  score.append(el('span', String(rating.betyg), 'score'), el('span', t('rating_of'), 'of'));
+  box.append(score, el('p', t('rating_role', { name: role.namn, typ: role.typ }), 'rating-role'));
+  const parts = [t('rating_voice', { n: rating.rost })];
+  if (rating.ansikte !== null) parts.push(t('rating_face', { n: rating.ansikte }));
+  box.append(el('p', parts.join(' · '), 'rating-parts'));
+  if (state.faceReading && !state.faceReading.enough) box.append(el('p', t('rating_face_unseen'), 'small'));
+  if (rating.styrka && STRENGTH_TEXT[rating.styrka]) box.append(el('p', t(STRENGTH_TEXT[rating.styrka]), 'rating-strength'));
+  if (rating.tips.length) {
+    const list = el('ul', '', 'style-obs');
+    for (const tip of rating.tips) if (TIP_TEXT[tipId(tip)]) list.append(el('li', t(TIP_TEXT[tipId(tip)])));
+    box.append(list);
+  }
+  if (!state.ratingImproved && state.ratingBest) box.append(el('p', t('rating_best_kept', { betyg: state.ratingBest.betyg }), 'small'));
+
+  const niva = state.scene.niva;
+  const scenes = scenesInLevel(niva);
+  const results = loadResults();
+  const done = scenes.filter((s) => results.scener[s.id]).length;
+  if (done >= scenes.length) {
+    box.append(el('p', t('rating_level_done', { n: niva }), 'rating-level'));
+    const button = el('button', t('level_result_button'), 'primary');
+    button.type = 'button';
+    button.dataset.action = 'show-result';
+    button.dataset.level = String(niva);
+    box.append(button);
+  } else {
+    box.append(el('p', t('rating_level_progress', { done, total: scenes.length, n: niva, left: scenes.length - done }), 'rating-level'));
+  }
+  box.append(el('p', t('rating_note'), 'small'));
+}
+
+// ---------- Resultatet efter en nivå ----------
+
+const OPEN_TEXT = { 1: 'result_open_1', 2: 'result_open_2', 3: 'result_open_3', 4: 'result_open_4' };
+const RANGE_TEXT = { hog: 'result_range_high', mellan: 'result_range_mid', lag: 'result_range_low' };
+const ROLES_TITLE = { storre: 'result_roles_bigger_title', mindre: 'result_roles_smaller_title', grund: 'result_roles_basics_title' };
+const ROLES_TEXT = { storre: 'result_roles_bigger', mindre: 'result_roles_smaller', grund: 'result_roles_basics' };
+
+// Det bästa betyget för varje scen i nivån, med scenen, rollen och rollens krav.
+function levelEntries(niva, results = loadResults()) {
+  return scenesInLevel(niva).map((scene) => {
+    const saved = results.scener[scene.id];
+    if (!saved) return null;
+    const role = scene.roller.find((r) => r.id === saved.roll) || scene.roller[0];
+    return { ...saved, krav: demandFor(role), scene, role };
+  }).filter(Boolean);
+}
+
+// Sammanfattningen i två stycken: hur det gick, med starkaste och svagaste rollen, och sedan
+// bredden, det som återkommer och blicken.
+function summaryText(result) {
+  const parts = [t(OPEN_TEXT[result.band])];
+  const { best, worst } = result;
+  parts.push(t('result_best', { typ: best.role.typ, titel: best.scene.titel, betyg: best.betyg }));
+  if (worst !== best && worst.betyg < best.betyg) {
+    const tip = (worst.tips || []).find((x) => NEED_TEXT[tipId(x)]);
+    const values = { typ: worst.role.typ, titel: worst.scene.titel, betyg: worst.betyg };
+    parts.push(tip ? t('result_worst', { ...values, what: t(NEED_TEXT[tipId(tip)]) }) : t('result_worst_plain', values));
+  }
+  const patterns = [t(RANGE_TEXT[result.range])];
+  if (result.repeat && NEED_TEXT[tipId(result.repeat)]) {
+    patterns.push(t('result_repeat', { n: result.repeat.n, total: LEVEL_SIZE, what: t(NEED_TEXT[tipId(result.repeat)]) }));
+  }
+  if (result.lookDown !== null) patterns.push(t(result.lookDown > LOOK_DOWN_LIMIT ? 'result_eyes_down' : 'result_eyes_up'));
+  return [parts.join(' '), patterns.join(' ')];
+}
+
+function showResult(niva) {
+  const level = levelByNumber(niva);
+  const entries = levelEntries(level.niva);
+  const result = levelResult(entries);
+  if (!result) {
+    goScenes();
+    return;
+  }
+  stopCamera();
+  $('#result-level').textContent = t('level_title', { n: level.niva, name: level.namn });
+  $('#result-total').textContent = decimal(result.total);
+  $('#result-verdict-title').textContent = t(ROLES_TITLE[result.roles]);
+  $('#result-verdict').textContent = t(ROLES_TEXT[result.roles]);
+  const summary = $('#result-summary');
+  summary.textContent = '';
+  for (const text of summaryText(result)) summary.append(el('p', text));
+  const list = $('#result-list');
+  list.textContent = '';
+  for (const entry of entries) {
+    const item = el('li');
+    item.append(el('span', t('result_role_line', { typ: capitalize(entry.role.typ), titel: entry.scene.titel })), el('strong', `${entry.betyg}${t('rating_of')}`));
+    list.append(item);
+  }
+  $('#results-clear-ask').hidden = true;
+  $('#results-clear').hidden = false;
+  show('result');
+}
+
+function clearResults() {
+  storageSet(STORE.results, null);
+  goScenes();
+  const status = $('#level-status');
+  status.textContent = t('results_cleared');
+  status.hidden = false;
+}
+
 // ---------- Mina tagningar ----------
 // Tagningarna sparas i webbläsarens databas i mobilen (takes.js) och skickas aldrig någonstans.
 
@@ -1358,6 +1635,7 @@ async function saveToTakes() {
       typ: state.blob.type,
       storlek: state.blob.size,
       stil: state.styleReading,
+      betyg: state.rating && state.rating.enough ? state.rating.betyg : null,
       video: state.blob
     });
     state.savedTakeId = id;
@@ -1372,7 +1650,8 @@ const takeDate = (ms) => new Date(ms).toLocaleString(t('locale_code'), { day: 'n
 
 function takeMeta(take) {
   const values = { role: take.roll, date: takeDate(take.skapad), length: clock(take.sekunder || 0) };
-  return t(take.roll ? 'take_meta_role' : 'take_meta', values);
+  const meta = t(take.roll ? 'take_meta_role' : 'take_meta', values);
+  return Number.isInteger(take.betyg) ? `${meta} · ${take.betyg}${t('rating_of')}` : meta;
 }
 
 async function showTakes(message = '') {
@@ -1555,7 +1834,7 @@ async function retryCamera() {
 // Köpet sker hos Stripe. Efteråt får mobilen en licenskod som visar att man har Plus.
 // Koden och gratisminuterna sparas i mobilens lagring, och inget annat.
 
-const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder', code: 'plus-kod' };
+const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder', code: 'plus-kod', face: 'ansikte-ok', results: RESULTS_KEY };
 
 function storageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -1635,6 +1914,8 @@ function renderPlanBits() {
   const max = maxTakeSeconds();
   $('#rec-max').textContent = `${max / 60}:00`;
   $('#record-max-note').textContent = t('record_max_note', { n: max / 60 });
+  renderLevelChips(); // låsta nivåer beror på planen
+  renderScenes();
 }
 
 // Återställningskoden som användaren skriver, på samma sätt som servern läser den:
@@ -1902,6 +2183,12 @@ document.addEventListener('click', (event) => {
     case 'take-delete-no': $('#take-confirm').hidden = true; $('#take-delete').hidden = false; break;
     case 'take-delete-yes': deleteShownTake(); break;
     case 'retry-camera': retryCamera(); break;
+    case 'face-yes': setFaceAnswer(true); break;
+    case 'face-no': setFaceAnswer(false); break;
+    case 'show-result': showResult(Number(target.dataset.level) || state.level); break;
+    case 'results-clear': $('#results-clear-ask').hidden = false; $('#results-clear').hidden = true; break;
+    case 'results-clear-no': $('#results-clear-ask').hidden = true; $('#results-clear').hidden = false; break;
+    case 'results-clear-yes': clearResults(); break;
     default: break;
   }
 });
@@ -1935,12 +2222,16 @@ document.addEventListener('change', (event) => {
     $('#angra-send').disabled = !event.target.checked || !$('#angra-name').value.trim();
     return;
   }
+  if (event.target.id === 'face-on') {
+    setFaceAnswer(event.target.checked);
+    return;
+  }
   if (event.target.name !== 'partner') return;
   state.partnerChosen = true;
   updateModes();
 });
 
-renderGenreChips();
+renderLevelChips();
 renderScenes();
 renderHome();
 updateVoice();

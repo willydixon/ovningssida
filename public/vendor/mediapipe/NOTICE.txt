@@ -1,0 +1,5 @@
+MediaPipe Tasks Vision (@mediapipe/tasks-vision 1.2.3) från Google, https://www.npmjs.com/package/@mediapipe/tasks-vision
+Licens: Apache License 2.0, se LICENSE i den här mappen. Filerna är oförändrade.
+Används för att mäta ansiktsuttryck i mobilen, bara om användaren har sagt ja. Inga bilder lämnar mobilen.
+Modellen face_landmarker.task kommer från Google MediaPipe:
+https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task

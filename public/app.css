@@ -627,3 +627,66 @@ footer a:hover, .page a:hover { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ---- Nivåer, betyg och resultat ---- */
+.chip-plus {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  margin-left: 6px;
+  opacity: .8;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  vertical-align: 2px;
+}
+.level-head { margin: 8px 0 4px; }
+.level-head h2 { margin: 6px 0 2px; }
+.level-head .small { margin: 0 0 6px; }
+.level-progress { color: var(--accent); font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+.level-head .notice { margin: 4px 0 8px; }
+.level-head .notice .ic { height: 16px; vertical-align: -3px; width: 16px; }
+#level-result .ic, .kicker .ic { height: 18px; width: 18px; }
+.scene.locked .scene-img { filter: grayscale(.6) brightness(.7); }
+.scene.locked strong { color: var(--quiet); }
+.tag.plus-tag { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tag.score-tag { border-color: rgba(127, 207, 143, .55); color: var(--good); }
+.face-status { color: var(--quiet); display: block; font-size: 13px; margin-top: 2px; }
+.face-status:empty { display: none; }
+
+.rating-card {
+  background: radial-gradient(110% 90% at 100% 0%, rgba(200, 69, 58, .16), transparent 65%), var(--surface);
+  border: 1px solid rgba(242, 181, 68, .35);
+  border-radius: 20px;
+  margin: 8px 0 16px;
+  padding: 18px;
+}
+.rating-card h2 { margin: 0 0 4px; }
+.rating-score, .result-score { align-items: baseline; display: flex; gap: 4px; margin: 4px 0 0; }
+.rating-score .score, .result-score .score {
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: 3.4rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+}
+.result-score .score { font-size: 4.4rem; }
+.rating-score .of, .result-score .of { color: var(--quiet); font-size: 1.2rem; font-weight: 700; }
+.rating-role { font-family: var(--display); font-size: 1.15rem; font-weight: 700; margin: 6px 0 2px; }
+.rating-parts { color: var(--quiet); font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+.rating-strength { color: var(--good); font-weight: 600; }
+.rating-level { background: var(--highlight); border-radius: 12px; font-weight: 600; padding: 10px 12px; }
+.rating-card .primary { margin: 0 0 12px; }
+.result-list { list-style: none; margin: 8px 0 16px; padding: 0; }
+.result-list li {
+  align-items: baseline;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+.result-list strong { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.result-summary p { margin: 0 0 12px; }

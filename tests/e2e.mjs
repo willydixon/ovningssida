@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SCENES } from '../public/scenes.js';
+import { SCENES, scenesInLevel } from '../public/scenes.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -62,7 +62,7 @@ try {
 
   await page.locator('.scene').first().click();
   check(await page.locator('#role-pick').isVisible(), 'Scen: rollvalet visas');
-  check((await page.locator('.scene .badge').count()) === SCENES.length, `Scen: alla ${SCENES.length} scener är märkta som utkast`);
+  check((await page.locator('.scene .badge').count()) === scenesInLevel(1).length && SCENES.every((x) => x.status === 'utkast'), `Scen: alla ${SCENES.length} scener är märkta som utkast`);
   await page.locator('#role-buttons button').first().click();
   await page.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
   check((await page.evaluate(() => window.__gum)) === 1, 'Kameran startade först efter rollvalet');
@@ -571,6 +571,7 @@ try {
   const { challengeFor } = await import('../public/content.js');
   const p8ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
   await p8ctx.route('**/api/ai-start**', (route) => route.fulfill({ json: { available: false } }));
+  await p8ctx.route('**/api/plus/info', (route) => route.fulfill({ json: { ready: false } })); // en låst scen öppnar Plus
   const p8 = await p8ctx.newPage();
   const p8errors = [];
   p8.on('console', (m) => { if (m.type() === 'error') p8errors.push(m.text()); });
@@ -622,20 +623,34 @@ try {
   await p8.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
   check(((await p8.locator('#playback').getAttribute('src')) || '').startsWith('blob:'), 'Dagens utmaning: tagningen går att titta på');
 
-  // Tillbaka till scenerna: bilder och genrer, och partnervalet kommer tillbaka.
+  // Tillbaka till scenerna: bilder och nivåer, och partnervalet kommer tillbaka.
   await p8.getByRole('button', { name: 'Spara' }).click();
   await p8.locator('[data-screen="save"] [data-action="to-scenes"]').click();
   await p8.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
   const images = await p8.$$eval('.scene-img', (imgs) => imgs.map((i) => i.complete && i.naturalWidth > 0));
-  check(images.length === SCENES.length && images.every(Boolean), `Scenerna har bilder som laddas (${images.length})`);
-  const chips = await p8.locator('#genre-chips .chip').allInnerTexts();
-  check(chips.join(',') === 'Alla,Drama,Komedi,Thriller,Romantik' && (await p8.locator('#genre-chips [aria-pressed="true"]').innerText()) === 'Alla', `Scenerna kan väljas efter genre (${chips.join(', ')})`);
-  await p8.locator('#genre-chips .chip', { hasText: 'Thriller' }).click();
-  const thrillers = await p8.locator('.scene strong').allInnerTexts();
-  check(thrillers.length === SCENES.filter((x) => x.genre === 'Thriller').length && thrillers.includes('Samtalet klockan tre') && (await p8.locator('#genre-chips [aria-pressed="true"]').innerText()) === 'Thriller',
-    'Genren Thriller visar bara thrillrarna');
-  await p8.locator('#genre-chips .chip', { hasText: 'Alla' }).click();
-  check((await p8.locator('.scene .tag').first().innerText()).toLowerCase() === 'drama', 'Scenerna visar genre');
+  check(images.length === scenesInLevel(1).length && images.every(Boolean), `Scenerna i nivå 1 har bilder som laddas (${images.length})`);
+  check((await p8.locator('#level-chips .chip').count()) === 5 && (await p8.locator('#level-chips [aria-pressed="true"]').innerText()).startsWith('Nivå 1') &&
+    (await p8.locator('#level-chips .chip-plus').count()) === 4, 'Scenerna delas in i fem nivåer, och nivå 2–5 är märkta Plus utan Plus');
+  check((await p8.locator('#level-name').innerText()) === 'Nivå 1: Vardag' && (await p8.locator('#level-progress').innerText()) === '0 av 5 scener har betyg', 'Nivå 1 visar namnet och hur många scener som har betyg');
+  for (const niva of [2, 3, 4, 5]) {
+    await p8.locator('#level-chips .chip').nth(niva - 1).click();
+    const titles = await p8.locator('.scene strong').allInnerTexts();
+    check(titles.join('|') === scenesInLevel(niva).map((x) => x.titel).join('|') && await p8.locator('#level-lock').isVisible() && (await p8.locator('.scene.locked').count()) === 5,
+      `Nivå ${niva} visar sina 5 scener, låsta utan Plus (${titles.join(', ')})`);
+    const loaded = await p8.waitForFunction(() => {
+      const list = [...document.querySelectorAll('.scene-img')];
+      return list.length === 5 && list.every((i) => i.complete && i.naturalWidth > 0);
+    }, null, { timeout: 5000 }).then(() => true, () => false);
+    check(loaded, `Nivå ${niva}: bilderna laddas`);
+  }
+  await p8.locator('.scene').first().click();
+  await p8.locator('[data-screen="plus"]').waitFor({ state: 'visible' });
+  check((await p8.locator('#plus-message').innerText()) === 'Scenerna i nivå 2–5 ingår i Plus.', 'En låst scen leder till Plus, där det står varför');
+  await p8.locator('[data-tab="scenes"]').click();
+  await p8.locator('[data-screen="scenes"]').waitFor({ state: 'visible' }).catch(() => {});
+  if (!(await p8.locator('[data-screen="scenes"]').isVisible())) await p8.locator('.tile[data-action="play-scenes"]').click();
+  await p8.locator('#level-chips .chip').first().click();
+  check((await p8.locator('.scene .tag').first().innerText()).toLowerCase() === 'drama' && await p8.locator('#level-lock').isHidden(), 'Nivå 1 är öppen och scenerna visar genre');
   await p8.locator('.scene').first().click();
   await p8.locator('#role-buttons button').first().click();
   await p8.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
@@ -1243,10 +1258,11 @@ try {
   await p13.locator('#age-continue').click();
   await p13.locator('.scene').first().waitFor();
   const enTitles = await p13.locator('.scene strong').allInnerTexts();
-  const enChips = await p13.locator('#genre-chips .chip').allInnerTexts();
-  check(enTitles.join('|') === SCENES_BY_LANG.en.map((x) => x.titel).join('|') && enChips.join(',') === 'All,Drama,Comedy,Thriller,Romance', `Språk: scenerna och genrerna är på engelska (${enChips.join(', ')})`);
+  const enLevel1 = SCENES_BY_LANG.en.filter((x) => x.niva === 1);
+  check(enTitles.join('|') === enLevel1.map((x) => x.titel).join('|') && (await p13.locator('#level-name').innerText()) === 'Level 1: Everyday' &&
+    (await p13.locator('#level-chips .chip').first().innerText()).startsWith('Level 1'), `Språk: scenerna och nivåerna är på engelska (${enTitles.join(', ')})`);
   const enImages = await p13.$$eval('.scene-img', (imgs) => imgs.map((i) => i.complete && i.naturalWidth > 0 && new URL(i.src).pathname.startsWith('/img/')));
-  check(enImages.length === SCENES_BY_LANG.en.length && enImages.every(Boolean), 'Språk: bilderna hämtas från samma mapp som på svenska');
+  check(enImages.length === enLevel1.length && enImages.every(Boolean), 'Språk: bilderna hämtas från samma mapp som på svenska');
   await p13.locator('.scene').first().click();
   await p13.locator('#role-buttons button').first().click();
   await p13.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
@@ -1287,6 +1303,180 @@ try {
   check(p13odd.length === 0, `Språk: inget annat skickas från de engelska sidorna (${p13odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
   check(p13errors.length === 0, `Inga fel på de engelska sidorna (${p13errors.join(' | ') || 'inga'})`);
   await p13ctx.close();
+
+  // ---- 14. Betyg, nivåer och resultat ----
+  // Mikrofonen byts mot en ton som testet slår av och på, som i Din spelstil. MediaPipe byts
+  // mot en låtsasversion som ger påhittade uttryck, så att testet inte behöver ett ansikte.
+  const FAKE_VISION = `
+    const NAMES = ['browInnerUp', 'browDownLeft', 'browDownRight', 'mouthSmileLeft', 'mouthSmileRight', 'eyeWideLeft', 'eyeWideRight', 'cheekSquintLeft'];
+    export const FilesetResolver = { forVisionTasks: async () => ({}) };
+    export const FaceLandmarker = {
+      createFromOptions: async () => ({
+        detectForVideo: (video, now) => {
+          const wave = Math.sin(now / 300);
+          const categories = NAMES.map((categoryName, index) => ({ index, categoryName, score: 0.25 + 0.2 * wave * (index % 2 ? 1 : -1) }));
+          categories.push({ index: 98, categoryName: 'eyeLookDownLeft', score: 0.1 }, { index: 99, categoryName: 'eyeLookDownRight', score: 0.1 });
+          return { faceBlendshapes: [{ categories }] };
+        }
+      })
+    };`;
+  const toneMic = () => {
+    const md = navigator.mediaDevices;
+    const orig = md.getUserMedia.bind(md);
+    md.getUserMedia = async (constraints) => {
+      const stream = await orig(constraints);
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      osc.frequency.value = 180;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.001;
+      const dest = ctx.createMediaStreamDestination();
+      osc.connect(gain).connect(dest);
+      osc.start();
+      window.__talk = (on) => { gain.gain.value = on ? 0.2 : 0.001; };
+      for (const track of stream.getAudioTracks()) { stream.removeTrack(track); track.stop(); }
+      stream.addTrack(dest.stream.getAudioTracks()[0]);
+      return stream;
+    };
+  };
+  const p14ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p14ctx.route('**/api/**', (route) => route.fulfill({ json: { available: false } }));
+  await p14ctx.route('**/vendor/mediapipe/models.json', (route) => route.fulfill({ json: { ansikte: true } }));
+  await p14ctx.route('**/vendor/mediapipe/vision_bundle.mjs', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_VISION }));
+  const p14 = await p14ctx.newPage();
+  const p14errors = [];
+  const p14requests = [];
+  p14.on('console', (m) => { if (m.type() === 'error') p14errors.push(m.text()); });
+  p14.on('pageerror', (e) => p14errors.push(String(e)));
+  p14.on('request', (r) => p14requests.push({ url: r.url(), method: r.method() }));
+  await p14.addInitScript(toneMic);
+  const ratedTake = async (index, { first = false } = {}) => {
+    await p14.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
+    await p14.locator('.scene').nth(index).click();
+    await p14.locator('#role-buttons button').first().click();
+    await p14.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+    await p14.getByRole('button', { name: 'Till inspelningen' }).click();
+    await p14.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+    if (first) {
+      await p14.locator('#face-ask').waitFor({ state: 'visible', timeout: 5000 });
+      const ask = await p14.locator('#face-ask').innerText();
+      check(/Ingen bild sparas eller skickas/.test(ask) && /utseendet bedöms aldrig/.test(ask), 'Ansiktet: frågan kommer före första tagningen och säger att ingen bild lämnar mobilen');
+      await p14.locator('[data-action="face-yes"]').click();
+      await p14.locator('#face-status', { hasText: 'Klar.' }).waitFor({ timeout: 5000 });
+      check(await p14.locator('#face-on').isChecked() && await p14.locator('#face-ask').isHidden(), 'Ansiktet: efter ja är rutan ikryssad och frågan borta');
+    }
+    await p14.locator('#start-rec').click();
+    await p14.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+    for (let k = 0; k < 5; k++) {
+      await p14.evaluate(() => window.__talk(true));
+      await sleep(800);
+      await p14.evaluate(() => window.__talk(false));
+      await sleep(400);
+    }
+    await p14.locator('#stop-rec').click();
+    await p14.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+    return p14.locator('#rating-review');
+  };
+  const toScenes = async () => {
+    await p14.getByRole('button', { name: 'Spara' }).click();
+    await p14.locator('[data-screen="save"] [data-action="to-scenes"]').click();
+  };
+
+  await p14.goto(`${BASE}/index.html`);
+  await p14.locator('.tile[data-action="play-scenes"]').click();
+  await p14.locator('#age-ok').check();
+  await p14.locator('#age-continue').click();
+  const level1 = scenesInLevel(1);
+  const scores = [];
+  for (let i = 0; i < level1.length; i++) {
+    const card = await ratedTake(i, { first: i === 0 });
+    const role = level1[i].roller[0];
+    const score = Number(await card.locator('.score').innerText());
+    scores.push(score);
+    check(await card.isVisible() && score >= 1 && score <= 10 && (await card.locator('.rating-role').innerText()) === `som ${role.namn}, ${role.typ}` &&
+      /^Röst \d+\/10 · Ansikte \d+\/10$/.test(await card.locator('.rating-parts').innerText()), `Betyg: ${level1[i].titel} får ${score}/10, med röst och ansikte`);
+    if (i < level1.length - 1) {
+      check((await card.locator('.rating-level').innerText()).startsWith(`${i + 1} av 5 scener i nivå 1 har betyg`), `Betyg: kortet visar att ${4 - i} scener är kvar`);
+      await toScenes();
+    }
+  }
+  const lastCard = p14.locator('#rating-review');
+  check((await lastCard.locator('.rating-level').innerText()) === 'Alla scener i nivå 1 har betyg. Ditt resultat är klart.', 'Resultat: efter fem scener är resultatet klart');
+  await lastCard.getByRole('button', { name: 'Se ditt resultat' }).click();
+  await p14.locator('[data-screen="result"]').waitFor({ state: 'visible' });
+  const total = await p14.locator('#result-total').innerText();
+  const mean = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+  check(total === String(mean).replace('.', ','), `Resultat: snittet av de fem betygen (${total} av 10)`);
+  const summary = await p14.locator('#result-summary').innerText();
+  check(/Starkast var du som /.test(summary) && summary.length > 120, `Resultat: AI:n sammanfattar vad den tycker (${summary.slice(0, 80)}…)`);
+  check(['Redo för större roller', 'Mindre roller passar dig just nu', 'Börja med mindre roller'].includes(await p14.locator('#result-verdict-title').innerText()), 'Resultat: säger om större eller mindre roller passar just nu');
+  check((await p14.locator('#result-list li').count()) === 5 && (await p14.locator('#result-list li').first().innerText()).startsWith(`${level1[0].roller[0].typ[0].toUpperCase()}`), 'Resultat: alla fem roller med sina betyg');
+  check(/Utseendet räknas aldrig/.test(await p14.locator('[data-screen="result"]').innerText()), 'Resultat: det står att utseendet aldrig räknas');
+
+  await p14.locator('[data-screen="result"] [data-action="to-scenes"]').click();
+  await p14.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
+  check((await p14.locator('#level-progress').innerText()) === '5 av 5 scener har betyg' && await p14.locator('#level-result').isVisible() && (await p14.locator('.scene .score-tag').count()) === 5,
+    'Scenerna: nivå 1 visar betygen och knappen till resultatet');
+  const stored = await p14.evaluate(() => JSON.parse(localStorage.getItem('provspelning')));
+  check(stored && Object.keys(stored.scener).length === 5 && Object.values(stored.scener).every((x) => Number.isInteger(x.betyg) && !('video' in x)), 'Betygen sparas bara som siffror i mobilen');
+
+  // Nej till ansiktet: då bygger betyget bara på rösten.
+  const voiceOnly = await (async () => {
+    await p14.locator('.scene').nth(1).click();
+    await p14.locator('#role-buttons button').first().click();
+    await p14.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+    await p14.getByRole('button', { name: 'Till inspelningen' }).click();
+    await p14.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+    await p14.locator('#face-on').uncheck();
+    await p14.locator('#start-rec').click();
+    await p14.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+    for (let k = 0; k < 5; k++) {
+      await p14.evaluate(() => window.__talk(true));
+      await sleep(800);
+      await p14.evaluate(() => window.__talk(false));
+      await sleep(400);
+    }
+    await p14.locator('#stop-rec').click();
+    await p14.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+    return p14.locator('#rating-review .rating-parts').innerText();
+  })();
+  check(/^Röst \d+\/10$/.test(voiceOnly) && (await p14.evaluate(() => localStorage.getItem('ansikte-ok'))) === 'nej', `Ansiktet: efter nej räknas bara rösten (${voiceOnly})`);
+
+  // Rensa resultaten.
+  await toScenes();
+  await p14.locator('#level-result').click();
+  await p14.locator('[data-screen="result"]').waitFor({ state: 'visible' });
+  await p14.locator('#results-clear').click();
+  await p14.locator('[data-action="results-clear-yes"]').click();
+  await p14.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
+  check((await p14.locator('#level-progress').innerText()) === '0 av 5 scener har betyg' && (await p14.locator('#level-status').innerText()) === 'Dina betyg och resultat är rensade.' &&
+    (await p14.evaluate(() => localStorage.getItem('provspelning'))) === null, 'Rensa: betygen tas bort från mobilen');
+
+  const p14odd = p14requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
+  check(p14odd.length === 0, `Betyget och ansiktet skickar inget över nätet (${p14odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  check(p14errors.length === 0, `Inga fel med betyg och resultat (${p14errors.join(' | ') || 'inga'})`);
+  await p14ctx.close();
+
+  // ---- 15. Med Plus är nivå 2–5 öppna ----
+  const p15ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p15ctx.addInitScript(() => localStorage.setItem('plus-licens', 'v1.e30.test'));
+  await p15ctx.route('**/api/**', (route) => route.fulfill({ json: { available: false } }));
+  await p15ctx.route('**/api/plus/status', (route) => route.fulfill({ json: { plan: 'plus', token: 'v1.e30.test', usedSeconds: 0 } }));
+  const p15 = await p15ctx.newPage();
+  const p15errors = [];
+  p15.on('pageerror', (e) => p15errors.push(String(e)));
+  await p15.goto(`${BASE}/index.html`);
+  await p15.waitForFunction(() => document.querySelector('#plus-banner').classList.contains('have'), null, { timeout: 5000 });
+  await p15.locator('.tile[data-action="play-scenes"]').click();
+  await p15.locator('#age-ok').check();
+  await p15.locator('#age-continue').click();
+  check((await p15.locator('#level-chips .chip-plus').count()) === 0, 'Plus: inga nivåer är låsta');
+  await p15.locator('#level-chips .chip').nth(4).click();
+  check(await p15.locator('#level-lock').isHidden() && (await p15.locator('.scene.locked').count()) === 0 && (await p15.locator('#level-name').innerText()) === 'Nivå 5: Superhjältar och skurkar', 'Plus: nivå 5 är öppen');
+  await p15.locator('.scene').first().click();
+  check(await p15.locator('#role-pick').isVisible() && (await p15.locator('#role-buttons button').first().innerText()) === `Spela ${scenesInLevel(5)[0].roller[0].namn}`, 'Plus: en scen i nivå 5 går att spela');
+  check(p15errors.length === 0, `Inga fel med Plus och nivåerna (${p15errors.join(' | ') || 'inga'})`);
+  await p15ctx.close();
 } finally {
   await browser.close();
   server.kill();

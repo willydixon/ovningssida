@@ -22,7 +22,7 @@ const check = (ok, message) => {
   if (!ok) failures.push(message);
 };
 
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: root, stdio: 'ignore' });
+const server = spawn(process.execPath, [fileURLToPath(new URL('./server.mjs', import.meta.url)), String(PORT)], { stdio: 'ignore' }); // med Netlifys huvuden
 await sleep(800);
 
 const browser = await chromium.launch({
@@ -1477,6 +1477,45 @@ try {
   check(await p15.locator('#role-pick').isVisible() && (await p15.locator('#role-buttons button').first().innerText()) === `Spela ${scenesInLevel(5)[0].roller[0].namn}`, 'Plus: en scen i nivå 5 går att spela');
   check(p15errors.length === 0, `Inga fel med Plus och nivåerna (${p15errors.join(' | ') || 'inga'})`);
   await p15ctx.close();
+
+  // ---- 16. Den riktiga MediaPipe under sidans säkerhetspolicy ----
+  // Testservern sätter samma huvuden som Netlify. MediaPipe och WebAssembly måste kunna laddas
+  // under både huvudets och sidans policy. Utan modellfilen ska det stanna vid modellen.
+  const p16ctx = await browser.newContext();
+  const p16 = await p16ctx.newPage();
+  const p16console = [];
+  p16.on('console', (m) => { if (m.type() === 'error') p16console.push(m.text()); });
+  const p16res = await p16.goto(`${BASE}/index.html`);
+  const csp = p16res.headers()['content-security-policy'] || '';
+  check(csp.includes("frame-ancestors 'none'") && csp.includes("'wasm-unsafe-eval'") && p16res.headers()['cross-origin-opener-policy'] === 'same-origin',
+    'Testservern sätter samma säkerhetshuvuden som Netlify');
+  const modelThere = (await (await p16.request.get(`${BASE}/vendor/mediapipe/models.json`)).json()).ansikte === true;
+  const loaded = await p16.evaluate(async () => {
+    try {
+      const vision = await import('/vendor/mediapipe/vision_bundle.mjs');
+      const files = await vision.FilesetResolver.forVisionTasks('/vendor/mediapipe/wasm');
+      await vision.FaceLandmarker.createFromOptions(files, {
+        baseOptions: { modelAssetPath: '/vendor/mediapipe/face_landmarker.task', delegate: 'CPU' },
+        runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true
+      });
+      return 'ok';
+    } catch (err) {
+      return String(err);
+    }
+  });
+  check(modelThere ? loaded === 'ok' : /Failed to fetch model/.test(loaded),
+    `MediaPipe och WebAssembly laddas under säkerhetspolicyn (${modelThere ? 'med modellen' : 'utan modellen stannar det vid modellen'}: ${loaded.slice(0, 80)})`);
+  check(!p16console.some((e) => /Content Security Policy|WebAssembly/i.test(e)), `Säkerhetspolicyn stoppar inte MediaPipe (${p16console.filter((e) => /Content Security|WebAssembly/i.test(e)).join(' | ') || 'inga stopp'})`);
+
+  // Köpknappen följer bara länkar till Stripe eller den egna sidan.
+  await p16ctx.route('**/api/plus/info', (route) => route.fulfill({ json: { available: true, test: true, price: 99 } }));
+  await p16ctx.route('**/api/plus/checkout', (route) => route.fulfill({ json: { url: 'https://example.com/betala' } }));
+  await p16.goto(`${BASE}/index.html`);
+  await p16.locator('#plus-banner').click();
+  await p16.locator('#plus-buy-btn').click();
+  await p16.locator('#plus-message').waitFor({ state: 'visible', timeout: 5000 });
+  check(p16.url().startsWith(BASE) && (await p16.locator('#plus-message').innerText()).startsWith('Något gick fel med köpet'), 'Köpet öppnar aldrig en sida som inte är Stripe');
+  await p16ctx.close();
 } finally {
   await browser.close();
   server.kill();

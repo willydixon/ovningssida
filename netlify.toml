@@ -11,7 +11,13 @@
     # connect-src tillåter bara den egna sidan och AI-motspelaren hos ElevenLabs (bara ljud,
     # och bara om användaren väljer AI som motspelare). Videon skickas aldrig.
     # form-action 'self' låter anmälan och frågorna skickas till den egna sidan, aldrig någon annanstans.
-    Content-Security-Policy = "default-src 'none'; font-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'none'"
+    # 'wasm-unsafe-eval' behövs för ansiktsanalysen (MediaPipe i public/vendor/mediapipe), som körs
+    # som WebAssembly i mobilen. Det tillåter WebAssembly, inte eval() av vanlig JavaScript.
+    # Policyn här gäller tillsammans med den i varje sidas <meta>, så båda måste tillåta det som sidan gör.
+    Content-Security-Policy = "default-src 'none'; font-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; manifest-src 'self'; connect-src 'self' wss://*.elevenlabs.io; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'none'"
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(), usb=()"
     Referrer-Policy = "no-referrer"
     X-Content-Type-Options = "nosniff"
+    # Bara https, och inga andra fönster får styra sidan.
+    Strict-Transport-Security = "max-age=31536000"
+    Cross-Origin-Opener-Policy = "same-origin"

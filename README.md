@@ -80,6 +80,25 @@ William svarade inte på frågan om ansiktet 20 november 2026. Det byggdes enlig
 - Läs Googles modellkort för Face Landmarker innan sidan öppnas för alla. Juristen bör också titta på ansiktsanalysen, även om den körs i mobilen.
 - Sidans säkerhetspolicy tillåter `wasm-unsafe-eval`, som MediaPipe behöver. Första gången laddas upp till 19 MB: MediaPipe 15 MB och modellen 3,6 MB. Det laddas bara efter ett ja.
 
+## Säkerhet och automatiska tester
+
+En säkerhetsgranskning gjordes 23 november 2026, efter en video om Claude-tillägg som William skickade. Det som rättades:
+
+- Säkerhetshuvudet i `netlify.toml` gäller tillsammans med varje sidas egen policy. Det saknade `'wasm-unsafe-eval'`, så ansiktsanalysen hade stoppats på den riktiga sidan. Ett enhetstest kontrollerar nu att huvudet tillåter allt som sidorna tillåter, och testservern (`tests/server.mjs`) sätter samma huvuden som Netlify, så att webbläsartesterna ser samma policy som den riktiga sidan.
+- `/api/ai-end` gav tillbaka tid för vilket samtal som helst med samma AI-motspelare. Nu måste samtalet ha startat efter att tiden reserverades och inom en kvart, och varje samtal räknas bara en gång. Annars dras hela den reserverade tiden.
+- Köpknappen och kundsidan följer bara länkar till Stripe eller den egna sidan.
+- Nya huvuden: `Strict-Transport-Security` och `Cross-Origin-Opener-Policy`.
+
+Det som kontrollerades och var i ordning: inga nycklar eller personuppgifter i repot eller dess historik, inga beroenden med kända sårbarheter (`npm audit`), licenskoden skrivs under med HMAC och jämförs på konstant tid, återställningskoden har 80 slumpade bitar och sparas bara som kontrollvärde, alla anrop som ändrar något kräver licenskoden i ett huvud (skyddar mot CSRF), ingen text sätts som HTML i sidan, och säkerhetspolicyn stoppar inline-skript, eval, inbäddning i andra sidor och anrop till andra adresser än ElevenLabs.
+
+Kvar att bestämma eller göra:
+
+- Repot på GitHub är publikt. Alla kan läsa koden, README och scenerna, även de som ingår i Plus. Det bör bli privat innan sidan öppnas, om Netlify kan fortsätta hämta det.
+- Funktionerna har ingen gräns för hur ofta de anropas. Gratispotten med AI-minuter (30 minuter per dygn för alla tillsammans) kan tömmas av någon som rensar sin mobil gång på gång.
+- Webbläsaren skickar AI-motspelarens instruktioner (scenen och rollen) till ElevenLabs. Någon som vet hur kan byta ut dem i sitt eget samtal. Det kostar bara den personens minuter.
+
+Testerna körs på GitHub vid varje ändring (`.github/workflows/tester.yml`), med åtgärderna låsta till exakta versioner. Innan något läggs ut: alla tester gröna, skärmbilder av det som ändrats, och ett ja från William.
+
 ## Anmälan och frågor
 
 Appen var helt gratis från 15 november 2026, enligt Williams beslut, och fick Plus som tillval 18 november 2026. Det som är gratis finns kvar för alla.

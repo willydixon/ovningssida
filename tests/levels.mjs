@@ -27,7 +27,7 @@ const cases = [
   { name: 'motljus', amp: 0.1, gray: 120, white: 0.3, expect: { Ljus: 'Motljus eller för starkt ljus' } }
 ];
 
-const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: root, stdio: 'ignore' });
+const server = spawn(process.execPath, [fileURLToPath(new URL('./server.mjs', import.meta.url)), String(PORT)], { stdio: 'ignore' }); // med Netlifys huvuden
 await sleep(800);
 const browser = await chromium.launch();
 

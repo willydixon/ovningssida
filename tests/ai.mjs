@@ -69,7 +69,7 @@ function fakeElevenLabs({ agents = [], failSigned = false, duration = 42 } = {})
       return Response.json({ signed_url: `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${new URL(url).searchParams.get('agent_id')}&token=abc` });
     }
     const conv = path.match(/\/conversations\/([\w-]+)$/);
-    if (conv) return Response.json({ agent_id: 'agent_plus', status: 'done', metadata: { call_duration_secs: duration } });
+    if (conv) return Response.json({ agent_id: 'agent_plus', status: 'done', metadata: { call_duration_secs: duration, start_time_unix_secs: Math.floor(Date.now() / 1000) } });
     return new Response('okänd', { status: 404 });
   };
   return { fetchImpl, calls };
@@ -169,7 +169,7 @@ let asks = 0;
 const slow = async (url) => {
   asks += 1;
   if (asks < 3) return new Response('finns inte än', { status: 404 });
-  return Response.json({ agent_id: 'agent_plus', status: 'done', metadata: { call_duration_secs: 75 } });
+  return Response.json({ agent_id: 'agent_plus', status: 'done', metadata: { call_duration_secs: 75, start_time_unix_secs: Math.floor(Date.now() / 1000) } });
 };
 res = await handle(req('', 'GET', plusToken), ENV, el.fetchImpl, store);
 data = await res.json();
@@ -180,6 +180,19 @@ res = await handle(req('', 'GET', plusToken), ENV, el.fetchImpl, store);
 data = await res.json();
 res = await end(endReq({ reservation: data.reservation, conversation_id: 'conv_annan' }), ENV, other, store, noWait);
 check((await res.json()).used_seconds === data.max_seconds, 'Ett samtal med en annan AI-motspelare räknas inte');
+
+// Ett gammalt kort samtal ger inte tillbaka tiden för ett nytt, långt samtal.
+const early = async () => Response.json({ agent_id: 'agent_plus', status: 'done', metadata: { call_duration_secs: 5, start_time_unix_secs: Math.floor(Date.now() / 1000) - 3600 } });
+res = await handle(req('', 'GET', plusToken), ENV, el.fetchImpl, store);
+data = await res.json();
+res = await end(endReq({ reservation: data.reservation, conversation_id: 'conv_gammalt' }), ENV, early, store, noWait);
+check((await res.json()).used_seconds === data.max_seconds, 'Ett samtal som startade före reservationen räknas inte');
+res = await handle(req('', 'GET', plusToken), ENV, el.fetchImpl, store);
+data = await res.json();
+res = await end(endReq({ reservation: data.reservation, conversation_id: 'conv_abc123' }), ENV, fakeElevenLabs({ duration: 3 }).fetchImpl, store);
+check((await res.json()).used_seconds === data.max_seconds, 'Samma samtal kan bara räknas en gång');
+const reserved = JSON.parse([...store.data.entries()].find(([k]) => k.startsWith('reservation/'))?.[1] || 'null');
+check(!reserved || Number.isInteger(reserved.created), 'Reservationen sparar när tiden reserverades');
 
 resetCache();
 el = fakeElevenLabs({ failSigned: true });

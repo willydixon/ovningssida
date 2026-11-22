@@ -1,0 +1,29 @@
+# Kör alla tester på GitHub varje gång koden ändras, och för varje pull request.
+# Samma tester som tests/run.sh, i Chromium med falsk kamera och mikrofon.
+# Åtgärderna är låsta till exakta versioner (commit), så att ingen kan byta ut dem i smyg.
+name: Tester
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tester:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm install --no-save playwright@1.63.0
+      - run: npx playwright install --with-deps chromium
+      - name: Sidorna är skapade från mallarna och texterna
+        run: node tools/render-pages.mjs && git diff --exit-code -- public
+      - run: sh tests/run.sh

@@ -2019,12 +2019,23 @@ async function restorePlus() {
   }
 }
 
+// Köpet och kundsidan öppnas bara hos Stripe (eller på den egna sidan), aldrig någon annanstans,
+// även om svaret från servern skulle vara fel.
+function safeRedirect(href) {
+  try {
+    const target = new URL(href, location.href);
+    return target.origin === location.origin || (target.protocol === 'https:' && (target.hostname === 'stripe.com' || target.hostname.endsWith('.stripe.com')));
+  } catch {
+    return false;
+  }
+}
+
 async function buyPlus() {
   const button = $('#plus-buy-btn');
   button.disabled = true;
   try {
     const { ok, data } = await api('/api/plus/checkout', { method: 'POST', body: { lang: lang() } }); // Stripe på sidans språk, och tillbaka hit
-    if (ok && data.url) {
+    if (ok && data.url && safeRedirect(data.url)) {
       location.href = data.url; // Stripes betalsida
       return;
     }
@@ -2036,7 +2047,7 @@ async function buyPlus() {
 async function openPortal() {
   try {
     const { ok, data } = await api('/api/plus/portal', { method: 'POST', body: { lang: lang() } });
-    if (ok && data.url) {
+    if (ok && data.url && safeRedirect(data.url)) {
       location.href = data.url; // Stripes sida för kort och uppsägning
       return;
     }

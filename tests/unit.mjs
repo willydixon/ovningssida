@@ -144,6 +144,27 @@ check(path.join(LANG_DIRS.sv, 'manifest.json') === MANIFEST, 'Den svenska appen 
   check(existsSync(models) && readFileSync(models, 'utf8') === renderFaceModels(), `vendor/mediapipe/models.json säger rätt om ansiktsmodellen finns (${existsSync(models) ? readFileSync(models, 'utf8').trim() : 'saknas'})`);
   check(['vision_bundle.mjs', 'wasm/vision_wasm_internal.js', 'wasm/vision_wasm_internal.wasm', 'LICENSE', 'NOTICE.txt'].every((f) => existsSync(path.join(FACE_DIR, f))), 'MediaPipe och dess licens finns i public/vendor/mediapipe');
 }
+// Säkerhetspolicyn i netlify.toml gäller tillsammans med varje sidas egen. Det som en sida
+// tillåter måste huvudet också tillåta, annars stoppas det på den riktiga sidan.
+{
+  const { netlifyHeaders } = await import('./server.mjs');
+  const parse = (csp) => Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).filter((d) => d[0]).map(([k, ...v]) => [k, v]));
+  const header = parse(netlifyHeaders()['Content-Security-Policy'] || '');
+  const pages = LANGS.flatMap((l) => readdirSync(LANG_DIRS[l]).filter((f) => f.endsWith('.html')).map((f) => path.join(LANG_DIRS[l], f)));
+  const conflicts = [];
+  for (const file of pages) {
+    const m = readFileSync(file, 'utf8').match(/http-equiv="Content-Security-Policy" content="([^"]+)"/);
+    if (!m) continue;
+    const meta = parse(m[1]);
+    for (const dir of ['script-src', 'connect-src', 'img-src', 'media-src', 'style-src', 'font-src']) {
+      const allowed = header[dir] || header['default-src'] || [];
+      for (const src of (meta[dir] || []).filter((x) => x !== "'none'")) if (!allowed.includes(src)) conflicts.push(`${path.relative(PUBLIC, file)} ${dir} ${src}`);
+    }
+  }
+  check(Object.keys(header).length > 5 && pages.length >= 20 && conflicts.length === 0, `Säkerhetspolicyn i netlify.toml tillåter allt som sidorna själva tillåter (${conflicts.join(', ') || 'inga krockar'})`);
+  check((header['frame-ancestors'] || []).join() === "'none'" && (header['object-src'] || []).join() === "'none'" && !(header['script-src'] || []).includes("'unsafe-inline'") && !(header['script-src'] || []).includes("'unsafe-eval'"),
+    'Säkerhetspolicyn stoppar inbäddning, plugins, inline-skript och eval');
+}
 // Appen heter ActWith AI på alla språk. Det gamla arbetsnamnet ska inte synas någonstans.
 check(LANGS.every((l) => TEXTS[l].app_name === 'ActWith AI'), 'Appen heter ActWith AI på alla språk');
 const shownFiles = LANGS.flatMap((l) => readdirSync(LANG_DIRS[l]).filter((f) => f.endsWith('.html') || f === 'manifest.json').map((f) => path.join(LANG_DIRS[l], f)));

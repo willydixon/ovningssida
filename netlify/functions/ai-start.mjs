@@ -110,7 +110,7 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
     if (!data.signed_url) throw new Error('ElevenLabs gav ingen länk');
     const reservation = randomUUID();
     await addSeconds(blobs, counterKey, seconds);
-    await blobs.set(`reservation/${reservation}`, JSON.stringify({ counterKey, seconds, agentId, plan }));
+    await blobs.set(`reservation/${reservation}`, JSON.stringify({ counterKey, seconds, agentId, plan, created: Math.floor(Date.now() / 1000) }));
     return json({ available: true, plan, signed_url: data.signed_url, max_seconds: seconds, reservation });
   } catch (err) {
     console.error(String(err && err.message ? err.message : err)); // aldrig nyckeln

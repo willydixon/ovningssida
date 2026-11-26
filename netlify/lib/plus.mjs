@@ -108,13 +108,18 @@ export function readToken(token, secret) {
 const SECRET_KEY = 'hemlis/licens';
 let cachedSecret = null;
 export const resetSecretCache = () => { cachedSecret = null; };
+// Nyckeln skapas första gången den behövs. Netlify Blobs kan visa en ny post först efter en
+// stund när man läser via cachen, så nyckeln läses starkt konsekvent, och om den här
+// funktionen var den som skapade nyckeln används den direkt i stället för att läsas tillbaka.
+// (Det var därför de första köpen 26 november stannade med 502.)
 export async function licenseSecret(env, store) {
   if (env.LICENSE_SECRET) return env.LICENSE_SECRET;
   if (cachedSecret) return cachedSecret;
-  let secret = await store.get(SECRET_KEY);
+  let secret = await store.get(SECRET_KEY, { consistency: 'strong' });
   if (!secret) {
-    await store.set(SECRET_KEY, randomBytes(48).toString('base64url'), { onlyIfNew: true });
-    secret = await store.get(SECRET_KEY);
+    const candidate = randomBytes(48).toString('base64url');
+    const written = await store.set(SECRET_KEY, candidate, { onlyIfNew: true });
+    secret = written && written.modified ? candidate : await store.get(SECRET_KEY, { consistency: 'strong' });
   }
   if (!secret) throw new Error('Licensnyckeln gick inte att skapa');
   cachedSecret = secret;

@@ -84,7 +84,7 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
   if (!key) return json({ available: false });
   if (new URL(request.url).searchParams.has('check')) return json({ available: true });
 
-  const blobs = store || getStore('ai-minuter');
+  const blobs = store || getStore({ name: 'ai-minuter', consistency: 'strong' });
   const token = bearer(request);
   const license = token ? readToken(token, await licenseSecret(env, blobs)) : null;
   const plan = license && license.exp > Math.floor(Date.now() / 1000) ? 'plus' : 'gratis';

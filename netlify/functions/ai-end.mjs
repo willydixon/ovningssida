@@ -56,7 +56,7 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
   const conversation = typeof body.conversation_id === 'string' ? body.conversation_id : '';
   if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'bad_reservation' }, 400);
 
-  const blobs = store || getStore('ai-minuter');
+  const blobs = store || getStore({ name: 'ai-minuter', consistency: 'strong' });
   const raw = await blobs.get(`reservation/${id}`);
   if (!raw) return json({ error: 'unknown_reservation' }, 404);
   const reservation = JSON.parse(raw);

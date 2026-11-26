@@ -105,7 +105,7 @@ export async function handle(request, env = process.env, f = fetch, store = null
   const url = new URL(request.url);
   const route = url.pathname.replace(/^\/api\/plus\/?/, '');
   const ready = !!key;
-  const blobs = () => store || getStore('ai-minuter');
+  const blobs = () => store || getStore({ name: 'ai-minuter', consistency: 'strong' });
 
   if (route === 'info') return json({ available: ready, test: ready && isTestKey(key), price: PRICE.amount / 100 });
   if (!ready) return json({ available: false }, 503);

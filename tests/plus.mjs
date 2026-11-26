@@ -88,7 +88,30 @@ function fakeStripe({ prices = [], sessionStatus = 'complete', subStatus = 'acti
 }
 function memoryStore() {
   const data = new Map();
-  return { data, async get(k) { return data.has(k) ? data.get(k) : null; }, async set(k, v) { data.set(k, v); }, async delete(k) { data.delete(k); } };
+  return {
+    data,
+    async get(k) { return data.has(k) ? data.get(k) : null; },
+    async set(k, v, opts = {}) {
+      if (opts.onlyIfNew && data.has(k)) return { modified: false };
+      data.set(k, v);
+      return { modified: true, etag: String(data.size) };
+    },
+    async delete(k) { data.delete(k); }
+  };
+}
+
+// Som Netlify Blobs med cache: en ny post syns inte vid vanlig läsning förrän en stund har gått,
+// men starkt konsekvent läsning ser den direkt.
+function laggyStore() {
+  const inner = memoryStore();
+  return {
+    ...inner,
+    strongReads: 0,
+    async get(k, opts = {}) {
+      if (opts.consistency === 'strong') { this.strongReads += 1; return inner.get(k); }
+      return null;
+    }
+  };
 }
 const ENV = { STRIPE_SECRET_KEY: 'sk_test_hemlig', LICENSE_SECRET: SECRET };
 const req = (route, { method = 'GET', token: tok, body } = {}) => new Request(`https://exempel.netlify.app/api/plus/${route}`, {
@@ -107,6 +130,19 @@ check(made.length >= 60 && (await licenseSecret({}, secretStore)) === made && se
 resetSecretCache();
 check((await licenseSecret({}, memoryStore())) !== made, 'Varje sajt får en egen slumpad nyckel');
 check((await licenseSecret({ LICENSE_SECRET: 'egen' }, memoryStore())) === 'egen', 'En LICENSE_SECRET i Netlify går före');
+resetSecretCache();
+const laggy = laggyStore();
+const laggySecret = await licenseSecret({}, laggy);
+check(laggySecret.length >= 60 && laggy.data.get('hemlis/licens') === laggySecret, 'Nyckeln går att skapa även när en ny post syns först efter en stund (felet vid köpen 26 november)');
+resetSecretCache();
+check((await licenseSecret({}, laggy)) === laggySecret && laggy.strongReads >= 2, 'Nyckeln läses starkt konsekvent');
+resetSecretCache();
+const race = memoryStore();
+race.data.set('hemlis/licens', 'redan-skapad-av-en-annan-funktion');
+const origGet = race.get;
+let firstRead = true;
+race.get = async (k, o) => { if (firstRead) { firstRead = false; return null; } return origGet(k, o); };
+check((await licenseSecret({}, race)) === 'redan-skapad-av-en-annan-funktion', 'Om en annan funktion hann skapa nyckeln först används den');
 resetSecretCache();
 const onlyStripe = { STRIPE_SECRET_KEY: 'sk_test_hemlig' };
 const autoStore = memoryStore();

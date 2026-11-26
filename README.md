@@ -70,6 +70,15 @@ William bad 20 november 2026 om betyg för olika roller, häftigare roller på h
 - Plus-nivåerna låses i mobilen, som de andra Plus-sakerna. Scenernas text finns i `scenes.js` och går alltså att läsa för den som letar. Det räcker för testversionen. I apparna bör låsningen göras mot köpet hos App Store och Google Play.
 - Testerna: `tests/rating.mjs` (betyget och resultatet), enhetstesterna (nivåerna och rollernas krav) och avsnitt 14–15 i `tests/e2e.mjs` (fem tagningar, resultatet, rensa, och nivåerna med Plus).
 
+## Dela resultatet
+
+William valde 26 november 2026 att resultatet ska gå att dela, till exempel på TikTok och Instagram.
+
+- `public/sharecard.js` ritar en bild på 1080 × 1920 (9:16) i mobilen när resultatet visas: en strålkastare och betyget på scengolvet, vad AI:n tycker om rollerna, de fem rollerna med betyg och scen, och raden om att betyget är en fingervisning och att utseendet aldrig räknas. Typsnitten är sidans egna. Ingen bild på användaren och inget namn finns med.
+- Allt viktigt står inom marginalerna där TikToks knappar och texterna i TikTok och Instagram inte täcker det (`SIDE`, `SAFE_TOP`, `SAFE_BOTTOM`).
+- Dela bilden öppnar mobilens delningsmeny (Web Share API med en PNG-fil). Bilden görs i förväg, eftersom iPhone bara öppnar menyn direkt efter ett tryck. Spara bilden laddar ned den. Finns ingen delningsmeny visas bara Spara bilden.
+- Testerna: `tests/sharecard.mjs` ritar alla nivåer, roller och bedömningar på båda språken med de riktiga typsnitten och kontrollerar att allt får plats utan att kortas. Avsnitt 14 och 14 b i `tests/e2e.mjs` delar och sparar bilden i appen.
+
 ## Ansiktets spel
 
 William svarade inte på frågan om ansiktet 20 november 2026. Det byggdes enligt rekommendationen: AI:n mäter hur ansiktet spelar, bara om användaren säger ja, och utseendet får aldrig något betyg. Ett betyg på utseendet går inte att lita på, blir ofta orättvist mot till exempel hudfärg, ålder och kön, och behöver en jurist först.

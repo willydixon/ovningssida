@@ -10,5 +10,6 @@ node tests/plus.mjs
 node tests/style.mjs
 node tests/rating.mjs
 node tests/face.mjs
+node tests/sharecard.mjs
 node tests/e2e.mjs
 node tests/levels.mjs

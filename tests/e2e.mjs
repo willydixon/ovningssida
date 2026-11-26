@@ -1350,6 +1350,11 @@ try {
   p14.on('pageerror', (e) => p14errors.push(String(e)));
   p14.on('request', (r) => p14requests.push({ url: r.url(), method: r.method() }));
   await p14.addInitScript(toneMic);
+  // Mobilens delningsmeny för bilder, som Chromium på Linux saknar. Den sparar bara vad som delades.
+  await p14.addInitScript(() => {
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: (data) => !!(data && Array.isArray(data.files) && data.files.every((f) => f.type === 'image/png')) });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (data) => { window.__shared = data.files.map((f) => ({ name: f.name, type: f.type, size: f.size })); } });
+  });
   const ratedTake = async (index, { first = false } = {}) => {
     await p14.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
     await p14.locator('.scene').nth(index).click();
@@ -1413,6 +1418,25 @@ try {
   check((await p14.locator('#result-list li').count()) === 5 && (await p14.locator('#result-list li').first().innerText()).startsWith(`${level1[0].roller[0].typ[0].toUpperCase()}`), 'Resultat: alla fem roller med sina betyg');
   check(/Utseendet räknas aldrig/.test(await p14.locator('[data-screen="result"]').innerText()), 'Resultat: det står att utseendet aldrig räknas');
 
+  // Dela resultatet: bilden görs i mobilen när resultatet visas och delas med mobilens delningsmeny.
+  await p14.locator('#result-share').waitFor({ state: 'visible', timeout: 8000 });
+  const shareImg = await p14.locator('#result-share-img').evaluate(async (img) => {
+    await img.decode();
+    return { w: img.naturalWidth, h: img.naturalHeight, src: img.src, alt: img.alt };
+  });
+  const verdict14 = await p14.locator('#result-verdict-title').innerText();
+  check(shareImg.w === 1080 && shareImg.h === 1920 && shareImg.src.startsWith('blob:') && shareImg.alt === `Bilden att dela: ${total}/10 på nivå 1. ${verdict14}.`,
+    `Dela: bilden är 1080 × 1920 och beskrivs för skärmläsare (${shareImg.alt})`);
+  const saveLink = p14.locator('#result-share-save');
+  check(await saveLink.isVisible() && (await saveLink.getAttribute('download')) === 'actwith-ai-resultat-niva-1.png' && (await saveLink.getAttribute('href')).startsWith('blob:'),
+    'Dela: Spara bilden laddar ned en PNG med nivån i namnet');
+  check(await p14.locator('#result-share-btn').isVisible(), 'Dela: knappen Dela bilden syns när mobilen kan dela bilder');
+  await p14.locator('#result-share-btn').click();
+  await p14.waitForFunction(() => window.__shared, null, { timeout: 5000 });
+  const shared = await p14.evaluate(() => window.__shared);
+  check(shared.length === 1 && shared[0].name === 'actwith-ai-resultat-niva-1.png' && shared[0].type === 'image/png' && shared[0].size > 50000 &&
+    (await p14.locator('#result-share-status').innerText()) === 'Klart.', `Dela: delningsmenyn får bilden som PNG (${shared[0] ? shared[0].size : 0} byte)`);
+
   await p14.locator('[data-screen="result"] [data-action="to-scenes"]').click();
   await p14.locator('[data-screen="scenes"]').waitFor({ state: 'visible' });
   check((await p14.locator('#level-progress').innerText()) === '5 av 5 scener har betyg' && await p14.locator('#level-result').isVisible() && (await p14.locator('.scene .score-tag').count()) === 5,
@@ -1456,6 +1480,39 @@ try {
   check(p14odd.length === 0, `Betyget och ansiktet skickar inget över nätet (${p14odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
   check(p14errors.length === 0, `Inga fel med betyg och resultat (${p14errors.join(' | ') || 'inga'})`);
   await p14ctx.close();
+
+  // ---- 14 b. Dela resultatet på engelska, i en webbläsare utan delningsmeny ----
+  const p14bctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  const saved14b = {
+    v: 1,
+    scener: Object.fromEntries(scenesInLevel(1).map((s, i) => [s.id, {
+      betyg: [8, 7, 9, 6, 7][i], roll: s.roller[0].id, profil: { tempo: 0.2 * i, pauser: 0.5, dynamik: 0.6, melodi: 0.1 * i, energi: 0.5 }, tips: [], blickNere: null, datum: 1764000000000 + i
+    }]))
+  };
+  await p14bctx.addInitScript((data) => { if (!localStorage.getItem('provspelning')) localStorage.setItem('provspelning', JSON.stringify(data)); }, saved14b);
+  await p14bctx.route('**/api/**', (route) => route.fulfill({ json: { available: false } }));
+  const p14b = await p14bctx.newPage();
+  const p14berrors = [];
+  p14b.on('console', (m) => { if (m.type() === 'error') p14berrors.push(m.text()); });
+  p14b.on('pageerror', (e) => p14berrors.push(String(e)));
+  await p14b.goto(`${BASE}/en/index.html`);
+  await p14b.locator('.tile[data-action="play-scenes"]').click();
+  await p14b.locator('#age-ok').check();
+  await p14b.locator('#age-continue').click();
+  await p14b.locator('#level-result').click();
+  await p14b.locator('#result-share').waitFor({ state: 'visible', timeout: 8000 });
+  const enShare = await p14b.locator('#result-share-img').evaluate(async (img) => {
+    await img.decode();
+    return { w: img.naturalWidth, h: img.naturalHeight, alt: img.alt };
+  });
+  check(enShare.w === 1080 && enShare.h === 1920 && enShare.alt.startsWith('The image to share: 7.4/10 on level 1.'), `Dela: bilden görs på engelska också (${enShare.alt})`);
+  check(await p14b.locator('#result-share-btn').isHidden() && await p14b.locator('#result-share-save').isVisible() &&
+    (await p14b.locator('#result-share-save').getAttribute('download')) === 'actwith-ai-result-level-1.png' && (await p14b.locator('#result-share-save').innerText()).trim() === 'Save the image',
+    'Dela: utan delningsmeny finns bara Save the image, med ett engelskt filnamn');
+  const shareDownload = await Promise.all([p14b.waitForEvent('download', { timeout: 5000 }), p14b.locator('#result-share-save').click()]).then(([d]) => d).catch(() => null);
+  check(shareDownload && shareDownload.suggestedFilename() === 'actwith-ai-result-level-1.png', `Dela: Save the image laddar ned bilden (${shareDownload ? shareDownload.suggestedFilename() : 'ingen nedladdning'})`);
+  check(p14berrors.length === 0, `Inga fel när resultatet delas på engelska (${p14berrors.join(' | ') || 'inga'})`);
+  await p14bctx.close();
 
   // ---- 15. Med Plus är nivå 2–5 öppna ----
   const p15ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });

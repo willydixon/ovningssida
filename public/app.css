@@ -690,3 +690,30 @@ footer a:hover, .page a:hover { color: var(--ink); }
 }
 .result-list strong { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .result-summary p { margin: 0 0 12px; }
+
+/* Bilden med resultatet att dela */
+.share-result {
+  align-items: flex-start;
+  background: radial-gradient(120% 90% at 0% 0%, rgba(242, 181, 68, .14), transparent 60%), var(--surface);
+  border: 1px solid rgba(242, 181, 68, .35);
+  border-radius: 20px;
+  display: flex;
+  gap: 16px;
+  margin: 8px 0 16px;
+  padding: 16px;
+}
+.share-preview {
+  aspect-ratio: 9 / 16;
+  background: var(--bg);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  flex: none;
+  height: auto;
+  max-width: 150px;
+  width: 36%;
+}
+.share-actions { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; }
+.share-actions h2 { margin: 0; }
+.share-actions .small { margin: 0; }
+.share-actions .small:empty { display: none; }
+.share-actions .ic { height: 18px; width: 18px; }

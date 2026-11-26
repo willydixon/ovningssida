@@ -237,6 +237,16 @@
     <h2>{{result_list_title}}</h2>
     <ul class="result-list" id="result-list"></ul>
     <p class="small">{{result_note}}</p>
+    <div class="share-result" id="result-share" hidden>
+      <img class="share-preview" id="result-share-img" alt="" width="1080" height="1920">
+      <div class="share-actions">
+        <h2>{{result_share_title}}</h2>
+        <p class="small">{{result_share_text}}</p>
+        <button type="button" class="primary" data-action="share-result" id="result-share-btn" hidden>{{icon:share}}{{result_share_button}}</button>
+        <a class="button secondary" id="result-share-save" href="#" download>{{icon:download}}{{result_share_save}}</a>
+        <p class="small" id="result-share-status" aria-live="polite"></p>
+      </div>
+    </div>
     <div class="row">
       <button type="button" class="primary" data-action="to-scenes">{{result_more}}</button>
       <button type="button" class="ghost" data-action="results-clear" id="results-clear">{{result_clear}}</button>

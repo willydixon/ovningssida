@@ -3,7 +3,9 @@
 // någonstans. Sidans säkerhetspolicy (connect-src) tillåter bara anrop till den
 // egna sidan och till AI-motspelaren hos ElevenLabs, som bara får ljud och bara
 // när användaren har valt AI som motspelare. Betyget och ansiktsanalysen räknas
-// också i mobilen (rating.js och face.js), och inga bilder lämnar den.
+// också i mobilen (rating.js och face.js), och inga bilder lämnar den. Bilden med
+// resultatet att dela ritas i mobilen (sharecard.js) och lämnar den bara om användaren
+// själv delar eller sparar den.
 
 import { SCENES, LEVELS, scenesInLevel } from './scenes.js';
 import { levelsFrom, lumaStats, percentile, rateSpeech, ratePeaks, rateNoise, rateLight } from './check.js';
@@ -14,6 +16,7 @@ import { FRAME_MS, pitchHz, createStyleMeter, readStyle, styleById, band } from 
 import { FREE_TAKES, canSaveMore, takeId, listTakes, getTake, addTake, deleteTake, countTakes, isQuotaError } from './takes.js';
 import { rateTake, demandFor, levelResult, readResults, addResult as addRating, RESULTS_KEY, LEVEL_SIZE, LOOK_DOWN_LIMIT } from './rating.js';
 import { FACE_MS, createFaceMeter, faceModelAvailable, loadFaceLandmarker, readFace } from './face.js';
+import { makeCard } from './sharecard.js';
 import { t, lang } from './texts.js'; // alla texter som visas ligger i texts.js, på sidans språk
 
 // Längsta tagning och AI-minuter beror på planen. Se också netlify/lib/plus.mjs.
@@ -86,6 +89,8 @@ const state = {
   rating: null, // betyget för den senaste tagningen
   ratingBest: null, // det bästa betyget för scenen, efter den senaste tagningen
   ratingImproved: false,
+  share: null, // bilden med resultatet att dela: { url, file }
+  shareRun: 0, // räknas upp för varje ny bild, så att en gammal inte visas
   // Ansiktet
   faceModel: null, // null tills det är kollat om modellen finns på sidan
   faceLandmarker: null,
@@ -1582,9 +1587,79 @@ function showResult(niva) {
   $('#results-clear-ask').hidden = true;
   $('#results-clear').hidden = false;
   show('result');
+  prepareShare(level, result, entries);
+}
+
+// ---------- Dela resultatet ----------
+// Bilden ritas i mobilen när resultatet visas (sharecard.js), så att den är klar när man
+// trycker på Dela bilden. Mobilens delningsmeny måste öppnas direkt vid trycket.
+
+function shareModel(level, result, entries) {
+  return {
+    brand: t('app_name'),
+    level: t('level_title', { n: level.niva, name: level.namn }),
+    score: decimal(result.total),
+    of: t('rating_of'),
+    title: t(ROLES_TITLE[result.roles]),
+    rows: entries.map((entry) => ({ role: capitalize(entry.role.typ), scene: entry.scene.titel, score: String(entry.betyg) })),
+    note: t('result_share_note')
+  };
+}
+
+function releaseShare() {
+  state.shareRun += 1;
+  if (state.share) URL.revokeObjectURL(state.share.url);
+  state.share = null;
+  const img = $('#result-share-img');
+  img.removeAttribute('src');
+  img.alt = '';
+  $('#result-share-save').href = '#';
+  $('#result-share-status').textContent = '';
+  $('#result-share').hidden = true;
+}
+
+async function prepareShare(level, result, entries) {
+  releaseShare();
+  const run = state.shareRun;
+  let blob;
+  try {
+    ({ blob } = await makeCard(shareModel(level, result, entries)));
+  } catch {
+    return; // utan bild visas ingen delning
+  }
+  if (run !== state.shareRun) return; // ett nyare resultat har visats under tiden
+  const name = `${t('result_share_file', { n: level.niva })}.png`;
+  let file = null;
+  try { file = new File([blob], name, { type: 'image/png' }); } catch { file = null; }
+  const url = URL.createObjectURL(blob);
+  state.share = { url, file };
+  const img = $('#result-share-img');
+  img.src = url;
+  img.alt = t('result_share_alt', { betyg: decimal(result.total), n: level.niva, titel: t(ROLES_TITLE[result.roles]) });
+  let canShare = false;
+  try { canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] })); } catch { canShare = false; }
+  $('#result-share-btn').hidden = !canShare;
+  const link = $('#result-share-save');
+  link.href = url;
+  link.download = name;
+  $('#result-share').hidden = false;
+}
+
+async function shareResult() {
+  const status = $('#result-share-status');
+  if (!state.share || !state.share.file) return;
+  status.textContent = '';
+  try {
+    await navigator.share({ files: [state.share.file] });
+    status.textContent = t('result_share_done');
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    status.textContent = t('result_share_failed');
+  }
 }
 
 function clearResults() {
+  releaseShare();
   storageSet(STORE.results, null);
   goScenes();
   const status = $('#level-status');
@@ -2197,6 +2272,7 @@ document.addEventListener('click', (event) => {
     case 'face-yes': setFaceAnswer(true); break;
     case 'face-no': setFaceAnswer(false); break;
     case 'show-result': showResult(Number(target.dataset.level) || state.level); break;
+    case 'share-result': shareResult(); break;
     case 'results-clear': $('#results-clear-ask').hidden = false; $('#results-clear').hidden = true; break;
     case 'results-clear-no': $('#results-clear-ask').hidden = true; $('#results-clear').hidden = false; break;
     case 'results-clear-yes': clearResults(); break;

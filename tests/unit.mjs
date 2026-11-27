@@ -182,7 +182,7 @@ const usedKeys = new Set([
   ...templates.flatMap(([, template]) => [...template.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))
 ]);
 // Koder från servern och adressparametrar som ser ut som textnycklar men inte är det.
-const NOT_TEXTS = new Set(['free_full', 'no_minutes', 'session_id', 'redan_avslutad']);
+const NOT_TEXTS = new Set(['free_full', 'no_minutes', 'ip_full', 'session_id', 'redan_avslutad']);
 const missingKeys = [...usedKeys].filter((k) => !(k in sv) && !NOT_TEXTS.has(k));
 const unusedKeys = Object.keys(sv).filter((k) => !usedKeys.has(k));
 check(missingKeys.length === 0, `Alla texter som används finns i texts.js (${missingKeys.join(', ') || 'inga saknas'})`);

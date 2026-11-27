@@ -1,38 +1,43 @@
 // Ger webbläsaren en tillfällig länk till AI-motspelaren hos ElevenLabs.
-// Adress: /api/ai-start. Med ?check svarar den bara om AI-motspelaren finns.
+// Adress: /api/ai-start?scene=<scenens id>&role=<din roll>&lang=<sv|en>.
+// Med ?check svarar den bara om AI-motspelaren finns.
 //
 // Nyckeln finns bara här på servern, som den hemliga miljövariabeln
 // ELEVENLABS_API_KEY i Netlify. Utan nyckel är AI-motspelaren avstängd och sidan
 // visar bara mobilens röst. Webbläsaren får en länk som gäller ett samtal, aldrig nyckeln.
 //
-// Två AI-motspelare skapas hos ElevenLabs första gången och hittas sedan på namnet:
-// en för gratis (snabb röst) och en för Plus (mer levande röst, längre samtal).
-// Ändras inställningarna byts versionen i namnet, så skapas nya.
+// Instruktionerna till AI:n byggs här från sidans egna scener (netlify/lib/setups.mjs).
+// Varje scen, roll, språk och plan får en egen AI-motspelare hos ElevenLabs, med
+// instruktionen, första repliken och språket inlagda, och ingenting får ändras från
+// webbläsaren. AI-motspelaren skapas första gången den behövs och hittas sedan på namnet.
+// Ändras scenen eller inställningarna får namnet en ny version, och den gamla tas bort.
 //
 // Minuterna: Plus har 60 minuter i månaden per prenumeration. Gratis har 5 minuter att
-// prova, som räknas i mobilen, och alla gratisanvändare delar på ett tak per dygn.
-// När ett samtal startar reserveras tid. /api/ai-end drar sedan det som användes.
+// prova, som räknas i mobilen, alla gratisanvändare delar på ett tak per dygn, och varje
+// uppkoppling har ett eget tak per dygn (netlify/lib/limits.mjs). När ett samtal startar
+// reserveras tid. /api/ai-end drar sedan det som användes.
 
 import { getStore } from '@netlify/blobs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { PLAN, MAX_AI_CONVERSATION, json, readToken, bearer, readSeconds, addSeconds, monthKey, dayKey, freeDailySeconds, licenseSecret } from '../lib/plus.mjs';
+import { setupFor } from '../lib/setups.mjs';
+import { freeSecondsPerIp, clientIp, ipHash, ipDayKey, sweepLater } from '../lib/limits.mjs';
 
 const API = 'https://api.elevenlabs.io/v1/convai';
-export const AGENT_NAMES = { gratis: 'ovningssida-motspelare-v1', plus: 'ovningssida-motspelare-plus-v1' };
-export const AGENT_NAME = AGENT_NAMES.gratis;
+export const AGENT_PREFIX = 'ovningssida-v2';
 
-export function agentConfig(plan = 'gratis') {
-  return {
-    name: AGENT_NAMES[plan],
-    tags: ['ovningssida', plan],
+// Namnet utan version: samma för alla versioner av AI-motspelaren för en scen och roll.
+export const agentStem = (plan, setup) => `${AGENT_PREFIX}-${plan}-${setup.language}-${setup.sceneId}-${setup.aiRole}`;
+
+// AI-motspelaren för en scen och roll. Versionen i namnet räknas fram ur inställningarna.
+export function agentConfig(plan, setup) {
+  const config = {
+    tags: ['ovningssida', plan, setup.language],
     conversation_config: {
       agent: {
-        first_message: '',
-        language: 'sv',
-        prompt: {
-          prompt: 'Du är motspelare i en övningsapp för skådespelare. Scenen och din roll skickas när samtalet startar.',
-          llm: 'gemini-2.5-flash'
-        }
+        first_message: setup.firstMessage || '',
+        language: setup.language,
+        prompt: { prompt: setup.prompt, llm: 'gemini-2.5-flash' }
       },
       // Plus får ElevenLabs mest uttrycksfulla röst för samtal, gratis den billigare snabba.
       tts: { model_id: plan === 'plus' ? 'eleven_v4_turbo' : 'eleven_flash_v2_5' },
@@ -41,15 +46,18 @@ export function agentConfig(plan = 'gratis') {
     },
     platform_settings: {
       auth: { enable_auth: true }, // samtal kräver en länk från den här funktionen
+      // Inget får bytas ut från webbläsaren: instruktionen, första repliken, språket eller rösten.
       overrides: {
         conversation_config_override: {
-          agent: { prompt: { prompt: true }, first_message: true, language: true },
-          tts: { voice_id: true }
+          agent: { prompt: { prompt: false }, first_message: false, language: false },
+          tts: { voice_id: false }
         }
       },
       privacy: { record_voice: false } // ElevenLabs sparar inte ljudet från samtalen
     }
   };
+  const version = createHash('sha256').update(JSON.stringify(config)).digest('hex').slice(0, 10);
+  return { name: `${agentStem(plan, setup)}-${version}`, ...config };
 }
 
 const cachedAgentIds = {};
@@ -61,36 +69,64 @@ async function call(fetchImpl, key, path, init = {}) {
     headers: { 'xi-api-key': key, 'content-type': 'application/json' }
   });
   if (!res.ok) throw new Error(`ElevenLabs svarade ${res.status} på ${path.split('?')[0]}`);
-  return res.json();
+  return res.status === 204 ? null : res.json().catch(() => null);
 }
 
-export async function findOrCreateAgent(fetchImpl, key, plan = 'gratis') {
-  if (cachedAgentIds[plan]) return cachedAgentIds[plan];
-  const name = AGENT_NAMES[plan];
-  const list = await call(fetchImpl, key, `/agents?search=${encodeURIComponent(name)}`);
-  const found = (list.agents || []).find((agent) => agent.name === name);
-  if (found) {
-    cachedAgentIds[plan] = found.agent_id;
-  } else {
-    const created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: JSON.stringify(agentConfig(plan)) });
-    cachedAgentIds[plan] = created.agent_id;
+// Tar bort äldre versioner av samma AI-motspelare, så att de inte blir liggande hos ElevenLabs.
+async function removeOldVersions(fetchImpl, key, store, stem, keep) {
+  const list = await call(fetchImpl, key, `/agents?search=${encodeURIComponent(stem)}`);
+  for (const agent of (list && list.agents) || []) {
+    if (typeof agent.name !== 'string' || !agent.name.startsWith(`${stem}-`) || agent.name === keep) continue;
+    await call(fetchImpl, key, `/agents/${encodeURIComponent(agent.agent_id)}`, { method: 'DELETE' });
+    await store.delete(`agent/${agent.name}`);
   }
-  return cachedAgentIds[plan];
 }
 
-export async function handle(request, env = process.env, fetchImpl = fetch, store = null) {
+// Ger AI-motspelaren för scenen och rollen: från minnet, från Netlify Blobs, från ElevenLabs
+// på namnet, eller nyskapad.
+export async function agentFor(fetchImpl, key, store, plan, setup) {
+  const config = agentConfig(plan, setup);
+  const { name } = config;
+  if (cachedAgentIds[name]) return cachedAgentIds[name];
+  let id = await store.get(`agent/${name}`);
+  if (!id) {
+    const list = await call(fetchImpl, key, `/agents?search=${encodeURIComponent(name)}`);
+    const found = ((list && list.agents) || []).find((agent) => agent.name === name);
+    if (found) {
+      id = found.agent_id;
+    } else {
+      const created = await call(fetchImpl, key, '/agents/create', { method: 'POST', body: JSON.stringify(config) });
+      if (!created || !created.agent_id) throw new Error('ElevenLabs gav ingen AI-motspelare');
+      id = created.agent_id;
+      await removeOldVersions(fetchImpl, key, store, agentStem(plan, setup), name)
+        .catch((err) => console.error(`Gamla versioner togs inte bort: ${err && err.message ? err.message : err}`));
+    }
+    await store.set(`agent/${name}`, id);
+  }
+  cachedAgentIds[name] = id;
+  return id;
+}
+
+// meta: { ip, waitUntil } från Netlify (context.ip och context.waitUntil).
+export async function handle(request, env = process.env, fetchImpl = fetch, store = null, meta = {}) {
   const key = env.ELEVENLABS_API_KEY;
   if (request.method !== 'GET') return json({ error: 'method' }, 405);
   if (!key) return json({ available: false });
-  if (new URL(request.url).searchParams.has('check')) return json({ available: true });
+  const params = new URL(request.url).searchParams;
+  if (params.has('check')) return json({ available: true });
+
+  const setup = setupFor(params.get('scene') || '', params.get('role') || '', params.get('lang') || 'sv');
+  if (!setup) return json({ available: true, error: 'bad_scene' }, 400);
 
   const blobs = store || getStore({ name: 'ai-minuter', consistency: 'strong' });
+  const secret = await licenseSecret(env, blobs);
   const token = bearer(request);
-  const license = token ? readToken(token, await licenseSecret(env, blobs)) : null;
+  const license = token ? readToken(token, secret) : null;
   const plan = license && license.exp > Math.floor(Date.now() / 1000) ? 'plus' : 'gratis';
 
   // Hur mycket tid som får reserveras för samtalet.
   let counterKey;
+  let ipKey = null;
   let seconds;
   if (plan === 'plus') {
     counterKey = `plus/${license.sub}/${monthKey()}`;
@@ -101,16 +137,25 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
     counterKey = `gratis/${dayKey()}`;
     const left = freeDailySeconds() - (await readSeconds(blobs, counterKey));
     if (left < 15) return json({ available: true, plan, error: 'free_full' }, 503);
-    seconds = Math.min(MAX_AI_CONVERSATION.gratis, left);
+    let ipLeft = Infinity;
+    const ip = clientIp(request, meta);
+    if (ip) {
+      ipKey = ipDayKey(ipHash(ip, secret));
+      ipLeft = freeSecondsPerIp() - (await readSeconds(blobs, ipKey));
+      if (ipLeft < 15) return json({ available: true, plan, error: 'ip_full' }, 429);
+    }
+    seconds = Math.min(MAX_AI_CONVERSATION.gratis, left, ipLeft);
   }
 
   try {
-    const agentId = await findOrCreateAgent(fetchImpl, key, plan);
+    const agentId = await agentFor(fetchImpl, key, blobs, plan, setup);
     const data = await call(fetchImpl, key, `/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`);
-    if (!data.signed_url) throw new Error('ElevenLabs gav ingen länk');
+    if (!data || !data.signed_url) throw new Error('ElevenLabs gav ingen länk');
     const reservation = randomUUID();
     await addSeconds(blobs, counterKey, seconds);
-    await blobs.set(`reservation/${reservation}`, JSON.stringify({ counterKey, seconds, agentId, plan, created: Math.floor(Date.now() / 1000) }));
+    if (ipKey) await addSeconds(blobs, ipKey, seconds);
+    await blobs.set(`reservation/${reservation}`, JSON.stringify({ counterKey, ipKey, seconds, agentId, plan, created: Math.floor(Date.now() / 1000) }));
+    sweepLater(blobs, meta.waitUntil);
     return json({ available: true, plan, signed_url: data.signed_url, max_seconds: seconds, reservation });
   } catch (err) {
     console.error(String(err && err.message ? err.message : err)); // aldrig nyckeln
@@ -118,5 +163,11 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
   }
 }
 
-export default (request) => handle(request);
-export const config = { path: '/api/ai-start' };
+export default (request, context = {}) =>
+  handle(request, process.env, fetch, null, { ip: context.ip, waitUntil: context.waitUntil ? (p) => context.waitUntil(p) : null });
+
+// Hos Netlify: högst 10 anrop per minut från samma uppkoppling.
+export const config = {
+  path: '/api/ai-start',
+  rateLimit: { windowLimit: 10, windowSize: 60, aggregateBy: ['ip', 'domain'] }
+};

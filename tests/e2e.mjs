@@ -427,8 +427,13 @@ try {
   // medan AI:n pratar, så att AI:n inte hör sig själv.
   const p7ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
   let aiStartFails = false;
+  let aiStartLimit = '';
+  let aiStartParams = null;
   await p7ctx.route('**/api/ai-start**', (route) => {
     if (new URL(route.request().url()).searchParams.has('check')) return route.fulfill({ json: { available: true } });
+    aiStartParams = new URL(route.request().url()).searchParams;
+    if (aiStartLimit === 'ip_full') return route.fulfill({ status: 429, json: { available: true, plan: 'gratis', error: 'ip_full' } });
+    if (aiStartLimit === 'busy') return route.fulfill({ status: 429, contentType: 'text/html', body: '<h1>Too Many Requests</h1>' }); // Netlifys gräns
     if (aiStartFails) return route.fulfill({ status: 502, json: { available: true, error: 'start_failed' } });
     return route.fulfill({ json: { available: true, signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_test&token=engang' } });
   });
@@ -510,9 +515,10 @@ try {
   await p7.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
   await waitUntil(async () => el.init !== null, 4000);
   check(el.url.includes('token=engang'), 'AI-motspelaren: webbläsaren använder länken från funktionen');
-  const agentOverride = (el.init && el.init.conversation_config_override && el.init.conversation_config_override.agent) || {};
-  check(agentOverride.language === 'sv' && (agentOverride.prompt || {}).prompt.includes(SCENES[0].situation) && !('first_message' in agentOverride),
-    'AI-motspelaren får scenen på svenska och väntar på din första replik');
+  check(aiStartParams && aiStartParams.get('scene') === SCENES[0].id && aiStartParams.get('role') === SCENES[0].roller[0].id && aiStartParams.get('lang') === 'sv',
+    'AI-motspelaren: webbläsaren ber servern om scenen, din roll och svenska');
+  check(el.init && !('conversation_config_override' in el.init) && !JSON.stringify(el.init).includes(SCENES[0].situation),
+    'AI-motspelaren: webbläsaren skickar inga instruktioner till ElevenLabs, de ligger redan hos AI-motspelaren');
   check(await p7.locator('#next-line').isHidden(), 'AI-motspelaren: ingen knapp för Nästa replik behövs');
 
   await aiTalk(true);
@@ -561,7 +567,23 @@ try {
   await p7.locator('#stop-rec').click();
   await p7.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
 
-  const p7realErrors = p7errors.filter((e) => !/502/.test(e)); // det falska felet i sista testet
+  // Gränserna: uppkopplingens gratisminuter är slut, eller för många försök på kort tid.
+  for (const [limit, status, text, what] of [
+    ['ip_full', 'ip_full', 'slut för i dag på den här uppkopplingen', 'Gränsen per uppkoppling: det står att gratisminuterna är slut i dag på uppkopplingen'],
+    ['busy', 'busy', 'För många försök på kort tid', 'Gränsen hos Netlify: det står att man ska vänta en minut']
+  ]) {
+    aiStartLimit = limit;
+    await p7.getByRole('button', { name: 'Ta om' }).click();
+    await p7.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+    await p7.locator('#start-rec').click();
+    await p7.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+    await waitUntil(async () => (await p7.locator('#ai-status').getAttribute('data-status')) === status, 3000);
+    check((await aiStatus()).includes(text) && await p7.locator('#stop-rec').isVisible(), `${what}, och inspelningen fortsätter`);
+    await p7.locator('#stop-rec').click();
+    await p7.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+  }
+
+  const p7realErrors = p7errors.filter((e) => !/502|429/.test(e)); // de falska felen i de sista testen
   check(p7realErrors.length === 0, `Inga fel med AI-motspelaren (${p7realErrors.join(' | ') || 'inga'})`);
   const p7odd = p7requests.filter((r) => r.method !== 'GET' || !(r.url.startsWith(BASE) || r.url.startsWith('blob:')));
   check(p7odd.length === 0, `Bara ljud går till ElevenLabs, inget annat lämnar sidan (${p7odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
@@ -589,6 +611,11 @@ try {
   check(await p8.evaluate(() => document.fonts.check('700 20px Fraunces') && document.fonts.check('400 16px Inter')), 'Typsnitten Fraunces och Inter laddas från den egna sidan');
   check(await p8.locator('#tabbar').isVisible() && (await p8.locator('#tabbar [aria-current="page"]').innerText()).includes('Hem'), 'Menyn längst ned syns och Hem är vald');
   check((await p8.locator('.tile.soon').count()) === 0 && (await p8.locator('button.tile').count()) === 6, 'Hemskärmen: fem övningar och Mina tagningar fungerar');
+  check((await p8.locator('#streak-number').innerText()) === '0' && (await p8.locator('#streak-unit').innerText()) === 'dagar i rad' &&
+    (await p8.locator('#streak-note').innerText()).startsWith('Öva i dag, så börjar en ny rad.'), 'Dagar i rad: en ny mobil visar 0 och hur man börjar');
+  const week8 = await p8.locator('#streak-week li').evaluateAll((items) => items.map((li) => ({ cls: li.className, label: li.getAttribute('aria-label'), letter: li.textContent })));
+  check(week8.length === 7 && week8[0].letter === 'M' && week8.filter((d) => d.cls.includes('today')).length === 1 && week8.find((d) => d.cls.includes('today')).label.startsWith('I dag, ') &&
+    week8.every((d) => !d.cls.includes('done')), `Dagar i rad: veckan börjar på måndag och dagens dag är markerad (${week8.map((d) => d.letter).join('')})`);
 
   // Uppvärmningen behöver ingen kamera.
   await p8.locator('.tile[data-action="warmup"]').click();
@@ -606,9 +633,18 @@ try {
   check((await p8.locator('#warmup-next').innerText()) === 'Klar', 'Uppvärmning: sista steget avslutas med Klar');
   await p8.locator('#warmup-next').click();
   check(await p8.locator('[data-screen="warmup-done"]').isVisible() && (await p8.evaluate(() => window.__gum)) === 0, 'Uppvärmning: klar utan att kameran startades');
+  await p8.locator('#tabbar [data-tab="start"]').click();
+  await p8.locator('[data-screen="start"]').waitFor({ state: 'visible' });
+  const todayDot = p8.locator('#streak-week li.today');
+  check((await p8.locator('#streak-number').innerText()) === '1' && (await p8.locator('#streak-unit').innerText()) === 'dag i rad' &&
+    (await p8.locator('#streak-note').innerText()) === 'Du har övat i dag. Kom tillbaka i morgon, så blir det 2.' &&
+    /\bdone\b/.test(await todayDot.getAttribute('class')) && /\bjust\b/.test(await todayDot.getAttribute('class')) && (await todayDot.getAttribute('aria-label')).endsWith(': övat'),
+    'Dagar i rad: efter uppvärmningen räknas dagen, och dagens prick tänds');
+  const days8 = await p8.evaluate(() => JSON.parse(localStorage.getItem('ovningsdagar')));
+  check(days8 && days8.v === 1 && days8.dagar.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(days8.dagar[0]) && days8.rekord === 1, 'Dagar i rad: bara datumet sparas i mobilen');
 
   // Dagens utmaning spelas in utan motspelare.
-  await p8.locator('[data-screen="warmup-done"] [data-action="daily"]').click();
+  await p8.locator('.hero [data-action="daily"]').click();
   check(await p8.locator('[data-screen="age"]').isVisible() && await p8.locator('#tabbar').isHidden(), 'Dagens utmaning: 18-årsfrågan kommer först, utan menyn');
   await p8.locator('#age-ok').check();
   await p8.locator('#age-continue').click();
@@ -664,8 +700,10 @@ try {
   const { MONOLOGUES, IMPROVS } = await import('../public/content.js');
   const p9ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
   let aiOn = false;
+  let improvStart = null;
   await p9ctx.route('**/api/ai-start**', (route) => {
     if (new URL(route.request().url()).searchParams.has('check')) return route.fulfill({ json: { available: aiOn } });
+    improvStart = new URL(route.request().url()).searchParams;
     return route.fulfill({ json: { available: true, signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&token=improv' } });
   });
   const p9 = await p9ctx.newPage();
@@ -746,8 +784,8 @@ try {
   await p9.locator('#start-rec').click();
   await p9.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
   for (let i = 0; i < 80 && !improvInit; i++) await sleep(50);
-  const improvAgent = (improvInit && improvInit.conversation_config_override.agent) || {};
-  check(improvAgent.first_message === IMPROVS[0].ai.forsta && /inget manus/.test((improvAgent.prompt || {}).prompt || ''), 'Improvisera: AI:n börjar med karaktärens första replik och vet att det inte finns något manus');
+  check(improvStart && improvStart.get('scene') === IMPROVS[0].id && improvStart.get('role') === 'A' && improvStart.get('lang') === 'sv' && improvInit && !('conversation_config_override' in improvInit),
+    'Improvisera: webbläsaren ber servern om situationen, och instruktionerna och första repliken kommer från servern');
   await p9.locator('#stop-rec').click();
   await p9.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
   check(p9errors.length === 0, `Inga fel i övningarna (${p9errors.join(' | ') || 'inga'})`);
@@ -783,6 +821,7 @@ try {
       case '/api/plus/aterstall': {
         const kod = JSON.parse(call.body || '{}').kod;
         if (kod === 'N8WS-2HJF-6PZE-Y1AV') return route.fulfill({ json: { plan: 'plus', token: plusToken, usedSeconds: 600, limitSeconds: 3600 } });
+        if (kod === 'ZZZZ-ZZZZ-ZZZZ-ZZZZ') return route.fulfill({ status: 429, json: { error: 'too_many' } }); // timgränsen
         return route.fulfill({ status: 404, json: { error: 'not_found' } });
       }
       case '/api/plus/status':
@@ -929,6 +968,10 @@ try {
   await p10.locator('#plus-restore-status').filter({ hasText: 'Ingen aktiv' }).waitFor({ timeout: 3000 }).catch(() => {});
   check((await p10.locator('#plus-restore-status').innerText()).startsWith('Ingen aktiv Plus har den koden') && JSON.parse(callsTo('/api/plus/aterstall')[0].body).kod === 'K7Q2-M9XD-4RTA-B3CE',
     'Återställning: en gammal kod fungerar inte, och koden skickas skriven på samma sätt hur den än skrevs in');
+  await p10.locator('#plus-restore-code').fill('ZZZZ-ZZZZ-ZZZZ-ZZZZ');
+  await p10.locator('#plus-restore-send').click();
+  await p10.locator('#plus-restore-status').filter({ hasText: 'För många' }).waitFor({ timeout: 3000 }).catch(() => {});
+  check((await p10.locator('#plus-restore-status').innerText()) === 'För många försök på kort tid. Vänta en stund och prova igen.', 'Återställning: efter för många försök står det att man ska vänta');
   await p10.locator('#plus-restore-code').fill('N8WS-2HJF-6PZE-Y1AV');
   await p10.locator('#plus-restore-code').press('Enter');
   await p10.locator('#plus-message').filter({ hasText: 'tillbaka' }).waitFor({ timeout: 5000 }).catch(() => {});
@@ -995,8 +1038,10 @@ try {
   const p10odd = p10requests.filter((r) => !(r.url.startsWith(BASE) || r.url.startsWith('blob:')) ||
     (r.method !== 'GET' && !/\/api\/(ai-end|plus\/(checkout|portal|angra|kod|aterstall))$/.test(new URL(r.url).pathname)));
   check(p10odd.length === 0, `Plus: bara köpet, kundsidan, ångern och AI-tiden skickas (${p10odd.map((r) => r.method + ' ' + r.url.slice(0, 60)).join(' | ') || 'inga andra anrop'})`);
+  let expected429 = 1; // timgränsen för återställningen
   const p10unexpected = p10errors.filter((e) => {
     if (expected404 > 0 && /status of 404/.test(e)) { expected404 -= 1; return false; }
+    if (expected429 > 0 && /status of 429/.test(e)) { expected429 -= 1; return false; }
     return true;
   });
   check(p10unexpected.length === 0, `Inga fel med Plus (${p10unexpected.join(' | ') || 'inga'})`);
@@ -1215,12 +1260,14 @@ try {
   const { SCENES_BY_LANG } = await import('../public/scenes.js');
   const p13ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
   const p13calls = [];
+  let enStart = null;
   await p13ctx.route('**/api/**', (route) => {
     const r = route.request();
     const u = new URL(r.url());
     p13calls.push({ path: u.pathname, method: r.method(), body: r.postData() || '' });
     if (u.pathname === '/api/ai-start') {
       if (u.searchParams.has('check')) return route.fulfill({ json: { available: true } });
+      enStart = u.searchParams;
       return route.fulfill({ json: { available: true, plan: 'gratis', signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&token=en', max_seconds: 240 } });
     }
     if (u.pathname === '/api/plus/info') return route.fulfill({ json: { available: true, test: true, price: 99 } });
@@ -1274,9 +1321,8 @@ try {
   await p13.locator('#start-rec').click();
   await p13.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
   for (let i = 0; i < 80 && !enInit; i++) await sleep(50);
-  const enAgent = (enInit && enInit.conversation_config_override.agent) || {};
-  check(enAgent.language === 'en' && /^You are the scene partner/.test(enAgent.prompt.prompt) && enAgent.prompt.prompt.includes(SCENES_BY_LANG.en[0].situation),
-    'Språk: AI-motspelaren pratar engelska och får den engelska scenen');
+  check(enStart && enStart.get('lang') === 'en' && enStart.get('scene') === SCENES_BY_LANG.en[0].id && enInit && !('conversation_config_override' in enInit),
+    'Språk: AI-motspelaren startas på engelska med den engelska scenen');
   await sleep(300);
   await p13.locator('#stop-rec').click();
   await p13.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
@@ -1515,6 +1561,52 @@ try {
   check(shareDownload && shareDownload.suggestedFilename() === 'actwith-ai-result-level-1.png', `Dela: Save the image laddar ned bilden (${shareDownload ? shareDownload.suggestedFilename() : 'ingen nedladdning'})`);
   check(p14berrors.length === 0, `Inga fel när resultatet delas på engelska (${p14berrors.join(' | ') || 'inga'})`);
   await p14bctx.close();
+
+  // ---- 14 c. Dagar i rad med tagningar ----
+  // Mobilen har övat i förrgår och i går, och rekordet är 5 dagar. En tagning på 3 sekunder
+  // räknas inte. En på 11 sekunder gör det, och då blir det 3 dagar i rad.
+  const p14cctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });
+  await p14cctx.addInitScript(() => {
+    if (localStorage.getItem('ovningsdagar')) return;
+    const day = (n) => {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    localStorage.setItem('ovningsdagar', JSON.stringify({ v: 1, dagar: [day(2), day(1)], rekord: 5 }));
+  });
+  await p14cctx.route('**/api/**', (route) => route.fulfill({ json: { available: false } }));
+  const p14c = await p14cctx.newPage();
+  const p14cerrors = [];
+  p14c.on('pageerror', (e) => p14cerrors.push(String(e)));
+  await p14c.goto(`${BASE}/index.html`);
+  check((await p14c.locator('#streak-number').innerText()) === '2' && (await p14c.locator('#streak-note').innerText()) === 'Öva i dag, så blir det 3 dagar i rad. Ditt rekord är 5 dagar.',
+    'Dagar i rad: raden från i går lever hela dagen, och rekordet visas');
+  const streakTake = async (seconds, first) => {
+    await p14c.locator('.hero [data-action="daily"]').click();
+    if (first) {
+      await p14c.locator('#age-ok').check();
+      await p14c.locator('#age-continue').click();
+    }
+    await p14c.locator('[data-screen="check"]').waitFor({ state: 'visible', timeout: 10000 });
+    await p14c.getByRole('button', { name: 'Till inspelningen' }).click();
+    await p14c.locator('[data-screen="record"]').waitFor({ state: 'visible' });
+    await p14c.locator('#start-rec').click();
+    await p14c.locator('#stop-rec').waitFor({ state: 'visible', timeout: 8000 });
+    await sleep(seconds * 1000);
+    await p14c.locator('#stop-rec').click();
+    await p14c.locator('[data-screen="review"]').waitFor({ state: 'visible', timeout: 8000 });
+    await p14c.evaluate(() => document.querySelector('#tabbar [data-action="to-start"]').click());
+    await p14c.locator('[data-screen="start"]').waitFor({ state: 'visible' });
+  };
+  await streakTake(3, true);
+  check((await p14c.locator('#streak-number').innerText()) === '2', 'Dagar i rad: en tagning på 3 sekunder räknas inte');
+  await streakTake(11, false);
+  check((await p14c.locator('#streak-number').innerText()) === '3' && (await p14c.locator('#streak-note').innerText()) === 'Du har övat i dag. Kom tillbaka i morgon, så blir det 4. Ditt rekord är 5 dagar.' &&
+    (await p14c.locator('#streak-week li.done').count()) >= 1 && /\bdone\b/.test(await p14c.locator('#streak-week li.today').getAttribute('class')),
+    'Dagar i rad: en tagning på 11 sekunder räknas, och det blir 3 dagar i rad');
+  check(p14cerrors.length === 0, `Inga fel med dagar i rad (${p14cerrors.join(' | ') || 'inga'})`);
+  await p14cctx.close();
 
   // ---- 15. Med Plus är nivå 2–5 öppna ----
   const p15ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera', 'microphone'] });

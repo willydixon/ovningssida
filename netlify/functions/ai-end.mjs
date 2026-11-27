@@ -71,6 +71,9 @@ export async function handle(request, env = process.env, fetchImpl = fetch, stor
     }
   }
   await addSeconds(blobs, reservation.counterKey, used - reservation.seconds);
+  if (typeof reservation.ipKey === 'string' && reservation.ipKey.startsWith('ip/')) {
+    await addSeconds(blobs, reservation.ipKey, used - reservation.seconds); // uppkopplingens tak för gratisminuter
+  }
   return json({ used_seconds: used, plan: reservation.plan });
 }
 

@@ -29,6 +29,11 @@
     </div>
     <h1 id="h-start" tabindex="-1" class="greeting">{{greet_day}}</h1>
     <p class="sub">{{home_sub}}</p>
+    <section class="streak" id="streak" aria-labelledby="streak-count">
+      <p class="streak-count" id="streak-count"><span class="streak-number" id="streak-number">0</span> <span id="streak-unit">{{streak_unit_many}}</span></p>
+      <ol class="streak-week" id="streak-week" aria-label="{{streak_week_label}}"></ol>
+      <p class="small streak-note" id="streak-note"></p>
+    </section>
     <article class="hero" aria-labelledby="h-daily">
       <p class="kicker" id="h-daily">{{icon:flame}}{{daily_kicker}}</p>
       <p class="hero-text" id="daily-text"></p>

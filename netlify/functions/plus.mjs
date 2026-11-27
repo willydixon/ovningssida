@@ -7,12 +7,16 @@
 //   POST /api/plus/angra              ångerknappen: ångrar köpet inom 14 dagar, annars sägs Plus upp
 //
 // Licenskoden skickas som Authorization: Bearer <kod>. Se netlify/lib/plus.mjs.
+//
+// Det som frågar Stripe utan licenskod (köpet, aktiveringen och återställningen) får bara
+// göras ett visst antal gånger i timmen från samma uppkoppling (netlify/lib/limits.mjs).
 
 import { getStore } from '@netlify/blobs';
 import {
   PLAN, PRICE, WITHDRAWAL_DAYS, json, stripe, isTestKey, readToken, bearer, tokenFor, activeStatus,
   readSeconds, monthKey, licenseSecret, makeRestoreCode, normalizeCode, codeHash
 } from '../lib/plus.mjs';
+import { HOURLY, clientIp, ipHash, allowHourly, sweepLater } from '../lib/limits.mjs';
 
 // Sidan som köpet och Stripes kundsida går tillbaka till, och texten vid köpknappen, per språk.
 const HOME = { sv: '/', en: '/en/' };
@@ -100,7 +104,8 @@ async function minutes(store, sub) {
   return { usedSeconds: used, limitSeconds: PLAN.plus.aiSeconds };
 }
 
-export async function handle(request, env = process.env, f = fetch, store = null) {
+// meta: { ip, waitUntil } från Netlify (context.ip och context.waitUntil).
+export async function handle(request, env = process.env, f = fetch, store = null, meta = {}) {
   const key = env.STRIPE_SECRET_KEY;
   const url = new URL(request.url);
   const route = url.pathname.replace(/^\/api\/plus\/?/, '');
@@ -112,6 +117,13 @@ export async function handle(request, env = process.env, f = fetch, store = null
 
   try {
     const secret = await licenseSecret(env, blobs());
+    const limit = HOURLY[route];
+    const ip = clientIp(request, meta);
+    if (limit && ip && ((route === 'activate' && request.method === 'GET') || (route !== 'activate' && request.method === 'POST'))) {
+      const allowed = await allowHourly(blobs(), route, ipHash(ip, secret), limit);
+      sweepLater(blobs(), meta.waitUntil);
+      if (!allowed) return json({ error: 'too_many' }, 429);
+    }
     if (route === 'checkout' && request.method === 'POST') {
       const language = await pageLanguage(request);
       const home = `${url.origin}${HOME[language]}`;
@@ -221,5 +233,11 @@ export async function handle(request, env = process.env, f = fetch, store = null
   }
 }
 
-export default (request) => handle(request);
-export const config = { path: '/api/plus/*' };
+export default (request, context = {}) =>
+  handle(request, process.env, fetch, null, { ip: context.ip, waitUntil: context.waitUntil ? (p) => context.waitUntil(p) : null });
+
+// Hos Netlify: högst 30 anrop per minut från samma uppkoppling.
+export const config = {
+  path: '/api/plus/*',
+  rateLimit: { windowLimit: 30, windowSize: 60, aggregateBy: ['ip', 'domain'] }
+};

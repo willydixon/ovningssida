@@ -96,7 +96,8 @@ function memoryStore() {
       data.set(k, v);
       return { modified: true, etag: String(data.size) };
     },
-    async delete(k) { data.delete(k); }
+    async delete(k) { data.delete(k); },
+    async list({ prefix = '' } = {}) { return { blobs: [...data.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })), directories: [] }; }
   };
 }
 
@@ -334,6 +335,31 @@ check(res.status === 502 && (await res.json()).error === 'stripe_failed', 'Om St
 check(errors.length === 1 && !errors[0].includes('sk_test'), 'Felet loggas utan nyckeln');
 res = await handle(req('okand', { token: data.token }), ENV, fakeStripe().fetchImpl, store);
 check(res.status === 404, 'Okända adresser ger 404');
+
+// ---- Gränser per uppkoppling ----
+// Det som frågar Stripe utan licenskod får bara göras ett visst antal gånger i timmen.
+{
+  const limitStore = memoryStore();
+  const ip = { ip: '203.0.113.9' };
+  const buys = fakeStripe();
+  const statuses = [];
+  for (let i = 0; i < 11; i++) statuses.push((await handle(req('checkout', { method: 'POST' }), ENV, buys.fetchImpl, limitStore, ip)).status);
+  check(statuses.slice(0, 10).every((x) => x === 200) && statuses[10] === 429 && buys.find('POST', '/checkout/sessions').length === 10,
+    `Köpet kan startas 10 gånger i timmen från samma uppkoppling, sedan inte fler och utan att fråga Stripe (${statuses.join(' ')})`);
+  check((await handle(req('checkout', { method: 'POST' }), ENV, fakeStripe().fetchImpl, limitStore, { ip: '203.0.113.10' })).status === 200, 'En annan uppkoppling kan fortfarande köpa');
+  const searches = fakeStripe();
+  const restoreStatuses = [];
+  for (let i = 0; i < 11; i++) restoreStatuses.push((await handle(req('aterstall', { method: 'POST', body: { kod: makeRestoreCode() } }), ENV, searches.fetchImpl, limitStore, ip)).status);
+  check(restoreStatuses.slice(0, 10).every((x) => x === 404) && restoreStatuses[10] === 429 && searches.find('GET', '/subscriptions/search').length === 10,
+    'Återställningen kan provas 10 gånger i timmen från samma uppkoppling');
+  const activations = [];
+  for (let i = 0; i < 21; i++) activations.push((await handle(req('activate?session_id=cs_test_abc'), ENV, fakeStripe().fetchImpl, limitStore, ip)).status);
+  check(activations.slice(0, 20).every((x) => x === 200) && activations[20] === 429, 'Aktiveringen efter köpet kan göras 20 gånger i timmen');
+  const infos = [];
+  for (let i = 0; i < 15; i++) infos.push((await handle(req('info'), ENV, fakeStripe().fetchImpl, limitStore, ip)).status);
+  check(infos.every((x) => x === 200), 'Informationen om Plus har ingen timgräns');
+  check(![...limitStore.data.keys(), ...limitStore.data.values()].some((x) => String(x).includes('203.0.113')), 'IP-adressen sparas aldrig, bara ett kontrollvärde');
+}
 
 if (failures.length) {
   console.log(`\n${failures.length} test misslyckades.`);

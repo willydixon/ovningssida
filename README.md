@@ -38,8 +38,9 @@ William valde 18 november 2026 utseendet Premiär bland tre förslag (`design/fo
 William valde 15 november 2026 att testa en AI-motspelare från ElevenLabs, som lyssnar och svarar med naturlig röst.
 
 - `netlify/functions/ai-start.mjs` svarar på `/api/ai-start`. Den hämtar en länk som gäller ett samtal, med nyckeln i den hemliga miljövariabeln `ELEVENLABS_API_KEY` i Netlify. Utan nyckel syns inte valet på sidan.
-- Första gången skapar funktionen två AI-motspelare hos ElevenLabs: `ovningssida-motspelare-v1` för gratis (rösten Eleven Flash v2.5, högst 240 sekunder per samtal) och `ovningssida-motspelare-plus-v1` för Plus (rösten Eleven v4 Turbo, högst 600 sekunder). Båda pratar svenska, använder Gemini 2.5 Flash som språkmodell och sparar inget ljud. Ändras inställningarna byts versionen i namnet.
-- `public/ai-partner.js` skickar mikrofonens ljud som 16-bitars PCM med 16 000 prover per sekund och spelar upp AI:ns röst. Scenen, rollen och första repliken skickas när samtalet startar. Medan AI:n pratar skickas tystnad, eftersom inspelningen saknar ekoreducering och AI:n annars skulle höra sig själv. Därför går det inte att avbryta AI:n.
+- Instruktionerna till AI:n byggs på servern (`netlify/lib/setups.mjs`) från sidans egna scener och improvisationer, med samma funktion som sidan (`buildAiSetup`). Webbläsaren skickar bara scenens id, sin roll och språket (`/api/ai-start?scene=…&role=…&lang=…`).
+- Varje scen, roll, språk och plan får en egen AI-motspelare hos ElevenLabs, som skapas första gången den behövs: till exempel `ovningssida-v2-gratis-sv-scen-001-B-<version>`. Instruktionen, första repliken och språket ligger i AI-motspelaren, och inget av det, eller rösten, får ändras från webbläsaren. Gratis använder rösten Eleven Flash v2.5 (högst 240 sekunder per samtal) och Plus Eleven v4 Turbo (högst 600 sekunder). Alla använder Gemini 2.5 Flash som språkmodell och sparar inget ljud. Versionen i namnet räknas fram ur inställningarna, så när en scen ändras skapas en ny AI-motspelare och den gamla tas bort. Med alla scener och improvisationer kan det bli upp till 220 AI-motspelare på kontot.
+- `public/ai-partner.js` skickar mikrofonens ljud som 16-bitars PCM med 16 000 prover per sekund och spelar upp AI:ns röst. Medan AI:n pratar skickas tystnad, eftersom inspelningen saknar ekoreducering och AI:n annars skulle höra sig själv. Därför går det inte att avbryta AI:n.
 - Sidans säkerhetspolicy tillåter anrop till den egna sidan och `wss://*.elevenlabs.io`, men inget annat.
 - Innan andra än William får använda den behövs svar i juristfrågan och en genomgång av ElevenLabs villkor och datahantering.
 
@@ -79,6 +80,15 @@ William valde 26 november 2026 att resultatet ska gå att dela, till exempel på
 - Dela bilden öppnar mobilens delningsmeny (Web Share API med en PNG-fil). Bilden görs i förväg, eftersom iPhone bara öppnar menyn direkt efter ett tryck. Spara bilden laddar ned den. Finns ingen delningsmeny visas bara Spara bilden.
 - Testerna: `tests/sharecard.mjs` ritar alla nivåer, roller och bedömningar på båda språken med de riktiga typsnitten och kontrollerar att allt får plats utan att kortas. Avsnitt 14 och 14 b i `tests/e2e.mjs` delar och sparar bilden i appen.
 
+## Dagar i rad
+
+William valde 28 november 2026 en räknare för hur många dagar i rad man har övat.
+
+- `public/streak.js` räknar dagarna. En dag räknas när man har gjort en tagning på minst 10 sekunder (`MIN_TAKE_SECONDS`) eller hela uppvärmningen. Raden lever hela dagen efter den senaste dagen man övade och bryts vid midnatt i mobilens tid.
+- Allt sparas bara i mobilens `localStorage` (`ovningsdagar`): de senaste 70 datumen, den senaste raden och rekordet. Inget skickas någonstans, och det står på integritetssidan.
+- Hemskärmen visar antalet dagar, veckan från måndag med en prick för varje dag man har övat, och vad som händer om man övar i dag. Rekordet visas när det är längre än det som går att nå i morgon.
+- Testerna: `tests/streak.mjs` (datum, sommartid, raden, rekordet och veckan) och avsnitt 8 och 14 c i `tests/e2e.mjs` (uppvärmningen och tagningar på 3 och 11 sekunder).
+
 ## Ansiktets spel
 
 William svarade inte på frågan om ansiktet 20 november 2026. Det byggdes enligt rekommendationen: AI:n mäter hur ansiktet spelar, bara om användaren säger ja, och utseendet får aldrig något betyg. Ett betyg på utseendet går inte att lita på, blir ofta orättvist mot till exempel hudfärg, ålder och kön, och behöver en jurist först.
@@ -100,11 +110,17 @@ En säkerhetsgranskning gjordes 23 november 2026, efter en video om Claude-till�
 
 Det som kontrollerades och var i ordning: inga nycklar eller personuppgifter i repot eller dess historik, inga beroenden med kända sårbarheter (`npm audit`), licenskoden skrivs under med HMAC och jämförs på konstant tid, återställningskoden har 80 slumpade bitar och sparas bara som kontrollvärde, alla anrop som ändrar något kräver licenskoden i ett huvud (skyddar mot CSRF), ingen text sätts som HTML i sidan, och säkerhetspolicyn stoppar inline-skript, eval, inbäddning i andra sidor och anrop till andra adresser än ElevenLabs.
 
+Skydd mot missbruk, som William valde 28 november 2026:
+
+- Hos Netlify (`rateLimit` i funktionernas config): högst 10 anrop i minuten till `/api/ai-start` och 30 till `/api/plus/*` från samma uppkoppling. Netlify tillåter 2 sådana regler på den nuvarande planen.
+- Gratisminuterna räknas på servern per uppkoppling: högst 10 minuter per dygn (`FREE_AI_SECONDS_PER_IP_DAY`, 600 sekunder om inget annat anges), utöver taket för alla gratisanvändare tillsammans (`FREE_AI_SECONDS_PER_DAY`). Delar många samma uppkoppling, som en skolklass på samma wifi, delar de också gränsen.
+- Köpet, aktiveringen och återställningen, som frågar Stripe utan licenskod, får göras 10, 20 och 10 gånger i timmen från samma uppkoppling (`netlify/lib/limits.mjs`).
+- IP-adressen sparas aldrig. I Netlify Blobs sparas ett kontrollvärde (HMAC med en nyckel som härleds från licensnyckeln) och en räknare, som tas bort efter dygnet eller timmen: av funktionerna själva, och varje natt klockan 03:17 UTC av `netlify/functions/stada.mjs`, även när ingen använder sidan. Det står på integritetssidan.
+- AI:ns instruktioner byggs på servern och kan inte bytas ut från webbläsaren (se AI-motspelaren ovan).
+
 Kvar att bestämma eller göra:
 
 - Repot på GitHub är publikt. Alla kan läsa koden, README och scenerna, även de som ingår i Plus. Det bör bli privat innan sidan öppnas, om Netlify kan fortsätta hämta det.
-- Funktionerna har ingen gräns för hur ofta de anropas. Gratispotten med AI-minuter (30 minuter per dygn för alla tillsammans) kan tömmas av någon som rensar sin mobil gång på gång.
-- Webbläsaren skickar AI-motspelarens instruktioner (scenen och rollen) till ElevenLabs. Någon som vet hur kan byta ut dem i sitt eget samtal. Det kostar bara den personens minuter.
 
 Testerna körs på GitHub vid varje ändring (`.github/workflows/tester.yml`), med åtgärderna låsta till exakta versioner. Innan något läggs ut: alla tester gröna, skärmbilder av det som ändrats, och ett ja från William.
 

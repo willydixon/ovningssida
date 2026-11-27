@@ -114,6 +114,8 @@ export function buildAiSetup(scene, myRole, language = 'sv') {
   const prompt = [...lines, improv ? '' : script].filter(Boolean).join('\n');
   const first = scene.repliker[0];
   return {
+    sceneId: scene.id,
+    role: myRole,
     prompt,
     language: language === 'en' ? 'en' : 'sv',
     firstMessage: first ? (first.roll === aiRole.id ? first.text : '') : (aiRole.forsta || ''),
@@ -206,11 +208,19 @@ export class AiPartner {
     this.setStatus('connecting');
     await this.ctx.audioWorklet.addModule(new URL('mic-worklet.js', import.meta.url).href); // samma mapp som skriptet, även från public/en/
     const headers = this.authToken ? { authorization: `Bearer ${this.authToken}` } : {};
-    const res = await this.fetchImpl('/api/ai-start', { cache: 'no-store', headers });
+    // Servern bygger instruktionerna till AI:n från sidans egna scener. Den får bara veta
+    // vilken scen, vilken roll och vilket språk (se netlify/lib/setups.mjs).
+    const query = new URLSearchParams({ scene: setup.sceneId || '', role: setup.role || '', lang: setup.language || 'sv' });
+    const res = await this.fetchImpl(`/api/ai-start?${query}`, { cache: 'no-store', headers });
     const data = await res.json().catch(() => ({}));
-    if (data.error === 'no_minutes' || data.error === 'free_full') {
+    if (data.error === 'no_minutes' || data.error === 'free_full' || data.error === 'ip_full') {
       const err = new Error('Inga AI-minuter kvar');
       err.code = data.error;
+      throw err;
+    }
+    if (res.status === 429) {
+      const err = new Error('För många försök på kort tid');
+      err.code = 'busy';
       throw err;
     }
     if (!res.ok || !data.signed_url) throw new Error('AI-motspelaren kunde inte starta');
@@ -231,12 +241,12 @@ export class AiPartner {
     this.out = this.ctx.createGain();
     this.out.connect(this.ctx.destination);
 
-    const agent = { prompt: { prompt: setup.prompt }, language: setup.language || 'sv' };
-    if (setup.firstMessage) agent.first_message = setup.firstMessage;
+    // Instruktionen, första repliken och språket ligger redan i AI-motspelaren hos ElevenLabs
+    // och kan inte bytas ut härifrån. Samtalet startas utan ändringar.
     const ws = new this.WebSocketImpl(data.signed_url);
     this.ws = ws;
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'conversation_initiation_client_data', conversation_config_override: { agent } }));
+      ws.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
     };
     ws.onmessage = (event) => this.onMessage(event.data);
     ws.onerror = () => { if (!this.stopped) this.setStatus('error'); };

@@ -17,6 +17,7 @@ import { FREE_TAKES, canSaveMore, takeId, listTakes, getTake, addTake, deleteTak
 import { rateTake, demandFor, levelResult, readResults, addResult as addRating, RESULTS_KEY, LEVEL_SIZE, LOOK_DOWN_LIMIT } from './rating.js';
 import { FACE_MS, createFaceMeter, faceModelAvailable, loadFaceLandmarker, readFace } from './face.js';
 import { makeCard } from './sharecard.js';
+import { STREAK_KEY, MIN_TAKE_SECONDS, localDay, readDays, addDay, streakInfo } from './streak.js';
 import { t, lang } from './texts.js'; // alla texter som visas ligger i texts.js, på sidans språk
 
 // Längsta tagning och AI-minuter beror på planen. Se också netlify/lib/plus.mjs.
@@ -89,6 +90,7 @@ const state = {
   rating: null, // betyget för den senaste tagningen
   ratingBest: null, // det bästa betyget för scenen, efter den senaste tagningen
   ratingImproved: false,
+  streakJust: false, // en ny dag med övning, som visas med en liten rörelse på hemskärmen
   share: null, // bilden med resultatet att dela: { url, file }
   shareRun: 0, // räknas upp för varje ny bild, så att en gammal inte visas
   // Ansiktet
@@ -108,6 +110,7 @@ function show(name) {
   for (const el of document.querySelectorAll('[data-screen]')) {
     el.hidden = el.dataset.screen !== name;
   }
+  if (name === 'start') renderStreak(); // dagens datum och dagens tagningar
   if (name !== 'check') cancelAnimationFrame(state.meterRaf);
   if (name !== 'warmup') stopWarmupTimer();
   if (name !== 'take') releaseTakeView();
@@ -135,6 +138,48 @@ function greeting(hour = new Date().getHours()) {
 function renderHome() {
   $('#h-start').textContent = greeting();
   $('#daily-text').textContent = challengeFor();
+  renderStreak();
+}
+
+// ---------- Dagar i rad ----------
+// Dagarna man har övat sparas bara i mobilen (streak.js). En tagning på minst
+// MIN_TAKE_SECONDS sekunder eller hela uppvärmningen räknas.
+
+const loadDays = () => readDays(storageGet(STORE.days));
+
+function markPracticed() {
+  const { data, added } = addDay(loadDays(), localDay());
+  if (!added) return;
+  storageSet(STORE.days, JSON.stringify(data));
+  state.streakJust = true; // dagens prick tänds med en liten rörelse nästa gång hemskärmen visas
+}
+
+function renderStreak() {
+  const info = streakInfo(loadDays(), localDay());
+  $('#streak-number').textContent = String(info.current);
+  $('#streak-unit').textContent = t(info.current === 1 ? 'streak_unit_one' : 'streak_unit_many');
+  const notes = [t(info.practicedToday ? 'streak_note_done' : info.current > 0 ? 'streak_note_keep' : 'streak_note_start', { n: info.current + 1 })];
+  if (info.best > info.current + 1) notes.push(t('streak_note_best', { n: info.best })); // bara när rekordet är längre än det som går att nå i morgon
+  $('#streak-note').textContent = notes.join(' ');
+  const letter = new Intl.DateTimeFormat(t('locale_code'), { weekday: 'narrow' });
+  const name = new Intl.DateTimeFormat(t('locale_code'), { weekday: 'long' });
+  const list = $('#streak-week');
+  list.textContent = '';
+  for (const d of info.week) {
+    const date = new Date(`${d.day}T12:00:00`);
+    const item = document.createElement('li');
+    item.className = [d.done && 'done', d.today && 'today', d.future && 'future', d.today && d.done && state.streakJust && 'just'].filter(Boolean).join(' ');
+    const day = name.format(date);
+    const label = d.future ? day : t(d.today ? (d.done ? 'streak_day_today_done' : 'streak_day_today') : d.done ? 'streak_day_done' : 'streak_day_missed', { day });
+    item.setAttribute('aria-label', label);
+    const short = el('span', letter.format(date), 'd');
+    const dot = el('span', '', 'mark');
+    short.setAttribute('aria-hidden', 'true');
+    dot.setAttribute('aria-hidden', 'true');
+    item.append(short, dot);
+    list.append(item);
+  }
+  if ($('[data-screen="start"]').hidden === false) state.streakJust = false;
 }
 
 // Kameran används bara av den som har bekräftat 18 år. Svaret gäller tills sidan stängs.
@@ -326,6 +371,7 @@ function nextWarmup() {
     $('#h-warmup').focus({ preventScroll: true });
   } else {
     stopWarmupTimer();
+    markPracticed(); // hela uppvärmningen räknas som en dag man har övat
     show('warmup-done');
   }
 }
@@ -891,6 +937,7 @@ function onRecordingStopped() {
   clearTake();
   state.blob = blob;
   state.blobUrl = URL.createObjectURL(blob);
+  if (state.takeSeconds >= MIN_TAKE_SECONDS) markPracticed();
 
   const note = $('#review-note');
   const reasons = {
@@ -1181,7 +1228,9 @@ function setAiStatus(status) {
     ended: 'ai_status_ended',
     minutes_out: 'ai_status_minutes_out',
     no_minutes: state.plan === 'plus' ? 'ai_paywall_plus' : 'ai_paywall_free',
-    full: 'ai_paywall_full'
+    full: 'ai_paywall_full',
+    ip_full: 'ai_paywall_ip',
+    busy: 'ai_status_busy'
   };
   const el = $('#ai-status');
   if (!keys[status]) return;
@@ -1224,7 +1273,8 @@ function startAi() {
   state.ai = ai;
   ai.connect(setup).catch((err) => {
     if (state.ai !== ai) return;
-    setAiStatus(err && err.code ? (err.code === 'free_full' ? 'full' : 'no_minutes') : 'error');
+    const code = err && err.code;
+    setAiStatus(code === 'free_full' ? 'full' : code === 'ip_full' || code === 'busy' ? code : code ? 'no_minutes' : 'error');
     ai.stop();
     state.ai = null;
   });
@@ -1909,7 +1959,7 @@ async function retryCamera() {
 // Köpet sker hos Stripe. Efteråt får mobilen en licenskod som visar att man har Plus.
 // Koden och gratisminuterna sparas i mobilens lagring, och inget annat.
 
-const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder', code: 'plus-kod', face: 'ansikte-ok', results: RESULTS_KEY };
+const STORE = { license: 'plus-licens', freeUsed: 'ai-gratis-sekunder', code: 'plus-kod', face: 'ansikte-ok', results: RESULTS_KEY, days: STREAK_KEY };
 
 function storageGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -2086,7 +2136,7 @@ async function restorePlus() {
       await showPlus(t('plus_restored'));
       return;
     }
-    status.textContent = t(res.status === 404 ? 'plus_restore_not_found' : res.status === 400 ? 'plus_restore_bad' : 'plus_restore_failed');
+    status.textContent = t(res.status === 404 ? 'plus_restore_not_found' : res.status === 400 ? 'plus_restore_bad' : res.status === 429 ? 'plus_busy' : 'plus_restore_failed');
   } catch {
     status.textContent = t('plus_restore_failed');
   } finally {
@@ -2108,15 +2158,17 @@ function safeRedirect(href) {
 async function buyPlus() {
   const button = $('#plus-buy-btn');
   button.disabled = true;
+  let busy = false;
   try {
-    const { ok, data } = await api('/api/plus/checkout', { method: 'POST', body: { lang: lang() } }); // Stripe på sidans språk, och tillbaka hit
+    const { ok, status, data } = await api('/api/plus/checkout', { method: 'POST', body: { lang: lang() } }); // Stripe på sidans språk, och tillbaka hit
     if (ok && data.url && safeRedirect(data.url)) {
       location.href = data.url; // Stripes betalsida
       return;
     }
+    busy = status === 429;
   } catch { /* visas nedan */ }
   button.disabled = false;
-  showPlus(t('plus_failed'));
+  showPlus(t(busy ? 'plus_busy' : 'plus_failed'));
 }
 
 async function openPortal() {

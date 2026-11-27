@@ -918,7 +918,9 @@ try {
   check(/återställningskod/.test(await p10.locator('#angra-none').innerText()), 'Återställning: ångerknappen hänvisar till koden när mobilen saknar Plus');
   await p10.locator('#angra-none [data-action="plus-restore-open"]').click();
   await p10.locator('#plus-restore').waitFor({ state: 'visible', timeout: 3000 });
-  check(await p10.locator('#plus-restore-code').evaluate((el) => document.activeElement === el), 'Återställning: fältet för koden får fokus');
+  // Fokus sätts när Plus-sidan har hämtat sina uppgifter, vilket kan dröja en stund efter att rutan syns.
+  const restoreFocused = await p10.waitForFunction(() => document.activeElement && document.activeElement.id === 'plus-restore-code', null, { timeout: 5000 }).then(() => true, () => false);
+  check(restoreFocused, 'Återställning: fältet för koden får fokus');
   await p10.locator('#plus-restore-code').fill('abcd');
   await p10.locator('#plus-restore-send').click();
   check((await p10.locator('#plus-restore-status').innerText()).startsWith('Koden har 16 tecken') && !callsTo('/api/plus/aterstall').length, 'Återställning: en för kort kod avvisas direkt i mobilen');
